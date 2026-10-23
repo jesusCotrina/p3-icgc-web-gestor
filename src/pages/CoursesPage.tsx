@@ -116,6 +116,9 @@ export function CoursesPage() {
                       {curso.isPublished ? 'Publicado' : 'Oculto'}
                     </span>
                     <span className="badge bg-brand-50 text-brand-700">Orden {curso.position}</span>
+                    {curso.comingSoon && (
+                      <span className="badge bg-amber-100 text-amber-900">Próximamente</span>
+                    )}
                   </div>
                   <h3 className="mt-1.5 truncate text-base font-bold text-brand-900">{curso.name}</h3>
                   <p className="mt-0.5 text-xs text-slate-500">

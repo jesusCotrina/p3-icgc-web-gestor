@@ -21,6 +21,7 @@ const VACIO: Formulario = {
   topics: [''],
   objective: '',
   instructor: '',
+  comingSoon: false,
   coverImage: null,
   coverAlt: '',
   position: 0,
@@ -106,7 +107,17 @@ export function CourseEditorPage() {
             {esNuevo ? 'Nuevo curso' : `Editar: ${form.name || 'curso'}`}
           </h2>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* La web muestra el aviso "¡Próximamente!" en la tarjeta y la ficha */}
+          <label className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+            <input
+              type="checkbox"
+              checked={form.comingSoon}
+              onChange={(e) => actualizar('comingSoon', e.target.checked)}
+              className="h-4 w-4 accent-amber-500"
+            />
+            Próximamente
+          </label>
           <label className="flex items-center gap-2 text-sm font-semibold text-brand-800">
             <input
               type="checkbox"
