@@ -1,0 +1,3 @@
+# Panel privado: nada de esto debe indexarse
+User-agent: *
+Disallow: /

@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Build de Vite
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Variables de entorno (la plantilla .env.example sí se sube)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
