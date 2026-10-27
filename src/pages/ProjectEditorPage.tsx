@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FotoConAlt } from '@/components/FotoConAlt';
+import { SubidorArchivo } from '@/components/BlockEditor';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { ListaEditable } from '@/components/ListaEditable';
+import { Paso } from '@/components/Paso';
+import { SaludSeo } from '@/components/SeoPanel';
 import { projectsApi, type ProjectPayload } from '@/lib/api';
+import { slugify } from '@/lib/format';
+import { revisarProyecto } from '@/lib/seo-reglas';
 import {
   PERU_REGIONS,
   PROJECT_STATUS_LABELS,
@@ -10,7 +15,8 @@ import {
   type ProjectStatus,
 } from '@/lib/types';
 
-type Formulario = Omit<ProjectPayload, 'coverImageId' | 'latitude' | 'longitude'> & {
+/** El slug no se muestra: se genera del título. */
+type Formulario = Omit<ProjectPayload, 'coverImageId' | 'slug' | 'latitude' | 'longitude'> & {
   coverImage: MediaDTO | null;
   // Como texto para permitir escribir "-10.68" sin que el input lo borre
   latitude: string;
@@ -19,7 +25,6 @@ type Formulario = Omit<ProjectPayload, 'coverImageId' | 'latitude' | 'longitude'
 
 const VACIO: Formulario = {
   title: '',
-  slug: '',
   duration: '',
   status: 'IN_PROGRESS',
   capital: '',
@@ -39,6 +44,9 @@ const VACIO: Formulario = {
   isPublished: true,
 };
 
+const opcional = <span className="font-medium text-slate-700">(opcional)</span>;
+const obligatorio = <span className="text-red-600">*</span>;
+
 /** Convierte el texto del input en número; vacío = null. Acepta coma decimal. */
 const aNumero = (texto: string): number | null => {
   const limpio = texto.trim().replace(',', '.');
@@ -56,13 +64,14 @@ export function ProjectEditorPage() {
   const [form, setForm] = useState<Formulario>(VACIO);
   const [cargando, setCargando] = useState(!esNuevo);
   const [guardando, setGuardando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (esNuevo) return;
     projectsApi
       .get(id!)
-      .then((p) =>
+      .then(({ slug: _slug, ...p }) =>
         setForm({
           ...p,
           coverAlt: p.coverAlt ?? '',
@@ -88,22 +97,34 @@ export function ProjectEditorPage() {
     }
   }
 
-  async function guardar(event: React.FormEvent) {
+  /** Primero se revisa lo obligatorio; si está todo, se pide confirmación. */
+  function revisar(event: React.FormEvent) {
     event.preventDefault();
     setError('');
 
-    const latitude = aNumero(form.latitude);
-    const longitude = aNumero(form.longitude);
-    if ((latitude === null) !== (longitude === null)) {
-      setError('Completa la latitud y la longitud, o deja ambas vacías.');
+    if ((aNumero(form.latitude) === null) !== (aNumero(form.longitude) === null)) {
+      setError('Completa los dos números de la ubicación en el mapa, o deja ambos vacíos.');
       return;
     }
+    if (form.isPublished && !form.coverImage) {
+      setError('Sube la foto del proyecto antes de publicarlo.');
+      return;
+    }
+    if (form.isPublished && !form.coverAlt?.trim()) {
+      setError('Escribe qué se ve en la foto antes de publicarlo.');
+      return;
+    }
+    setConfirmando(true);
+  }
 
+  async function guardar() {
     const { coverImage, ...resto } = form;
     const payload: ProjectPayload = {
       ...resto,
-      latitude,
-      longitude,
+      // La dirección del proyecto sale del título; nadie tiene que escribirla
+      slug: slugify(form.title),
+      latitude: aNumero(form.latitude),
+      longitude: aNumero(form.longitude),
       coverImageId: coverImage?.id ?? null,
       coverAlt: form.coverAlt?.trim() || null,
       achievements: form.achievements.map((t) => t.trim()).filter(Boolean),
@@ -115,6 +136,7 @@ export function ProjectEditorPage() {
       else await projectsApi.update(id!, payload);
       navigate('/proyectos');
     } catch (err) {
+      setConfirmando(false);
       setError(err instanceof Error ? err.message : 'No se pudo guardar el proyecto');
     } finally {
       setGuardando(false);
@@ -123,6 +145,8 @@ export function ProjectEditorPage() {
 
   if (cargando) return <div className="card h-96 animate-pulse" />;
 
+  const avisos = revisarProyecto({ ...form, coverAlt: form.coverAlt ?? '' });
+
   const campo = (
     key: 'duration' | 'capital' | 'location' | 'community' | 'implementingEntity' | 'area',
     etiqueta: string,
@@ -130,160 +154,289 @@ export function ProjectEditorPage() {
   ) => (
     <div>
       <label htmlFor={key} className="label">
-        {etiqueta} <span className="text-red-500">*</span>
+        {etiqueta} {obligatorio}
       </label>
-      <input id={key} required value={form[key]} onChange={(e) => actualizar(key, e.target.value)} className="input" placeholder={placeholder} />
+      <input
+        id={key}
+        required
+        value={form[key]}
+        onChange={(e) => actualizar(key, e.target.value)}
+        className="input"
+        placeholder={placeholder}
+      />
     </div>
   );
 
   return (
-    <form onSubmit={guardar} className="mx-auto max-w-4xl space-y-5">
+    <form onSubmit={revisar} className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/proyectos" className="text-sm font-medium text-brand-600 hover:text-brand-800">
+          <Link to="/proyectos" className="text-sm font-bold text-brand-700 hover:text-brand-900">
             ← Volver a proyectos
           </Link>
-          <h2 className="mt-1 text-lg font-bold text-brand-900">
-            {esNuevo ? 'Nuevo proyecto' : `Editar: ${form.title || 'proyecto'}`}
+          <h2 className="mt-1 text-xl font-extrabold text-slate-900">
+            {esNuevo ? 'Nuevo proyecto' : form.title || 'Editar proyecto'}
           </h2>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm font-semibold text-brand-800">
-            <input type="checkbox" checked={form.isPublished} onChange={(e) => actualizar('isPublished', e.target.checked)} className="h-4 w-4 accent-brand-600" />
+
+        {/* Cómo se muestra en la web: a la vista, junto al botón de guardar */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="flex items-center gap-2 rounded-lg border border-silver-200 bg-white px-3 py-2 text-sm font-bold text-slate-900">
+            <input
+              type="checkbox"
+              checked={form.isPublished}
+              onChange={(e) => actualizar('isPublished', e.target.checked)}
+              className="h-4 w-4 accent-brand-600"
+            />
             Publicado en la web
           </label>
+          <label
+            title="El número más bajo sale primero. Los 4 primeros aparecen en el inicio."
+            className="flex items-center gap-2 rounded-lg border border-silver-200 bg-white py-1 pl-3 pr-1 text-sm font-bold text-slate-900"
+          >
+            Posición
+            <input
+              type="number"
+              min={0}
+              value={form.position}
+              onChange={(e) => actualizar('position', Number(e.target.value))}
+              className="w-16 rounded-md border border-silver-200 px-2 py-1 text-sm font-semibold"
+            />
+          </label>
           <button type="submit" disabled={guardando} className="btn-primary">
-            {guardando ? 'Guardando...' : 'Guardar proyecto'}
+            {esNuevo ? 'Crear proyecto' : 'Guardar cambios'}
           </button>
         </div>
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
           {error}
         </p>
       )}
 
-      {/* ── Datos ── */}
-      <section className="card space-y-5 p-5">
-        <h3 className="text-sm font-bold text-brand-900">Datos del proyecto</h3>
-
-        <div>
-          <label htmlFor="title" className="label">
-            Título del proyecto <span className="text-red-500">*</span>
-          </label>
-          <input id="title" required value={form.title} onChange={(e) => actualizar('title', e.target.value)} className="input" placeholder="Instalación del sistema de riego tecnificado en..." />
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          {campo('duration', 'Duración', '18 meses (marzo 2025 – agosto 2026)')}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-5">
+        {/* ── Paso 1: lo primero que ve la gente ── */}
+        <Paso numero={1} titulo="Título, foto y objetivo">
           <div>
-            <label htmlFor="status" className="label">Estado</label>
-            <select id="status" value={form.status} onChange={(e) => actualizar('status', e.target.value as ProjectStatus)} className="input">
-              {Object.entries(PROJECT_STATUS_LABELS).map(([valor, etiqueta]) => (
-                <option key={valor} value={valor}>{etiqueta}</option>
-              ))}
-            </select>
-          </div>
-          {campo('capital', 'Capital', 'S/ 2 450 000')}
-          {campo('area', 'Área que abarca', '320 hectáreas de cultivo')}
-          {campo('community', 'Comunidad', 'Comunidad campesina ...')}
-          {campo('implementingEntity', 'Entidad implementadora', 'Municipalidad distrital de ...')}
-        </div>
-
-        <div>
-          <label htmlFor="objective" className="label">
-            Objetivo del proyecto <span className="text-red-500">*</span>
-          </label>
-          <textarea id="objective" required rows={3} value={form.objective} onChange={(e) => actualizar('objective', e.target.value)} className="input" />
-        </div>
-      </section>
-
-      {/* ── Avances y logros ── */}
-      <section className="card p-5">
-        <ListaEditable
-          id="achievements"
-          etiqueta="Avances y logros"
-          items={form.achievements}
-          onChange={(items) => actualizar('achievements', items)}
-          placeholder="65 % de avance físico en canales y reservorios"
-          ayuda="Agrega tantos como quieras. Enter crea el siguiente; las flechas cambian el orden."
-        />
-      </section>
-
-      {/* ── Ubicación y mapa ── */}
-      <section className="card space-y-5 p-5">
-        <div>
-          <h3 className="text-sm font-bold text-brand-900">Ubicación y mapa</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            La región y las comunidades beneficiadas se suman en el mapa “Nuestra huella en el Perú”
-            y en las cifras del hero de la página de inicio.
-          </p>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label htmlFor="region" className="label">
-              Región <span className="text-red-500">*</span>
+            <label htmlFor="title" className="label">
+              Título del proyecto {obligatorio}
             </label>
-            <select id="region" required value={form.region} onChange={(e) => actualizar('region', e.target.value)} className="input">
-              <option value="" disabled>Elige una región</option>
-              {PERU_REGIONS.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
+            <input
+              id="title"
+              required
+              value={form.title}
+              onChange={(e) => actualizar('title', e.target.value)}
+              className="input text-lg font-bold"
+              placeholder="Sistema de riego tecnificado en la comunidad de..."
+            />
           </div>
-          {campo('location', 'Ubicación (distrito, provincia)', 'Distrito de Chaupimarca, provincia de Pasco')}
+
+          <div className="grid gap-5 rounded-xl border border-silver-200 bg-silver-100/60 p-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <p className="label">Foto del proyecto {obligatorio}</p>
+              <SubidorArchivo
+                kind="IMAGE"
+                media={form.coverImage}
+                onUploaded={(media) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    coverImage: media,
+                    coverAlt: prev.coverAlt || media.alt || '',
+                  }))
+                }
+                onClear={() => actualizar('coverImage', null)}
+              />
+              <div>
+                <label htmlFor="coverAlt" className="label">
+                  ¿Qué se ve en la foto? {obligatorio}
+                </label>
+                <input
+                  id="coverAlt"
+                  value={form.coverAlt ?? ''}
+                  onChange={(e) => actualizar('coverAlt', e.target.value)}
+                  maxLength={300}
+                  className="input"
+                  placeholder="Canal de riego construido en la ladera"
+                />
+                <p className="hint">Una frase corta. Google la lee porque no puede ver fotos.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <label htmlFor="objective" className="label">
+                ¿Qué busca el proyecto? {obligatorio}
+              </label>
+              <textarea
+                id="objective"
+                required
+                value={form.objective}
+                onChange={(e) => actualizar('objective', e.target.value)}
+                className="input min-h-40 flex-1 resize-y"
+                placeholder="Mejorar el riego de 320 hectáreas para que las familias produzcan todo el año."
+              />
+            </div>
+          </div>
+        </Paso>
+
+        {/* ── Paso 2: datos ── */}
+        <Paso numero={2} titulo="Datos del proyecto">
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div>
+              <label htmlFor="status" className="label">
+                Estado
+              </label>
+              <select
+                id="status"
+                value={form.status}
+                onChange={(e) => actualizar('status', e.target.value as ProjectStatus)}
+                className="input"
+              >
+                {Object.entries(PROJECT_STATUS_LABELS).map(([valor, etiqueta]) => (
+                  <option key={valor} value={valor}>
+                    {etiqueta}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {campo('duration', 'Duración', '18 meses')}
+            {campo('capital', 'Inversión', 'S/ 2 450 000')}
+          </div>
+          <div className="grid gap-5 sm:grid-cols-3">
+            {campo('community', 'Comunidad', 'Comunidad campesina de ...')}
+            {campo('implementingEntity', 'Quién lo ejecuta', 'Municipalidad distrital de ...')}
+            {campo('area', 'Área', '320 hectáreas')}
+          </div>
+        </Paso>
+
+        {/* ── Paso 3: mapa ── */}
+        <Paso numero={3} titulo="¿Dónde está?">
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div>
+              <label htmlFor="region" className="label">
+                Región {obligatorio}
+              </label>
+              <select
+                id="region"
+                required
+                value={form.region}
+                onChange={(e) => actualizar('region', e.target.value)}
+                className="input"
+              >
+                <option value="" disabled>
+                  Elige una región
+                </option>
+                {PERU_REGIONS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {campo('location', 'Distrito y provincia', 'Chaupimarca, Pasco')}
+            <div>
+              <label htmlFor="communitiesBenefited" className="label">
+                Comunidades beneficiadas
+              </label>
+              <input
+                id="communitiesBenefited"
+                type="number"
+                min={0}
+                value={form.communitiesBenefited}
+                onChange={(e) => actualizar('communitiesBenefited', Number(e.target.value))}
+                className="input"
+              />
+            </div>
+          </div>
+
           <div>
-            <label htmlFor="communitiesBenefited" className="label">Comunidades beneficiadas</label>
-            <input id="communitiesBenefited" type="number" min={0} value={form.communitiesBenefited} onChange={(e) => actualizar('communitiesBenefited', Number(e.target.value))} className="input" />
+            <label htmlFor="latitude" className="label">
+              Punto exacto en el mapa {opcional}
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                id="latitude"
+                aria-label="Latitud"
+                inputMode="decimal"
+                value={form.latitude}
+                onChange={(e) => actualizar('latitude', e.target.value)}
+                onPaste={pegarCoordenadas}
+                className="input"
+                placeholder="Latitud: -10.6864"
+              />
+              <input
+                id="longitude"
+                aria-label="Longitud"
+                inputMode="decimal"
+                value={form.longitude}
+                onChange={(e) => actualizar('longitude', e.target.value)}
+                onPaste={pegarCoordenadas}
+                className="input"
+                placeholder="Longitud: -76.2567"
+              />
+            </div>
+            <p className="hint">
+              En Google Maps, clic derecho sobre el lugar, copia los números y pégalos aquí. Si lo
+              dejas vacío, se marca el centro de la región.
+            </p>
           </div>
+        </Paso>
+
+        {/* ── Paso 4: avances ── */}
+        <Paso numero={4} titulo="Avances y logros">
+          <ListaEditable
+            id="achievements"
+            etiqueta="Logros del proyecto"
+            items={form.achievements}
+            onChange={(items) => actualizar('achievements', items)}
+            placeholder="65 % de avance en canales y reservorios"
+            ayuda="Un logro por línea. Enter agrega otro."
+          />
+        </Paso>
+
+        <div className="flex justify-end">
+          <button type="submit" disabled={guardando} className="btn-primary">
+            {esNuevo ? 'Crear proyecto' : 'Guardar cambios'}
+          </button>
+        </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <label htmlFor="latitude" className="label">Latitud del marcador</label>
-            <input id="latitude" inputMode="decimal" value={form.latitude} onChange={(e) => actualizar('latitude', e.target.value)} onPaste={pegarCoordenadas} className="input font-mono" placeholder="-10.6864" />
+        {/* ── Revisión SEO, a la vista mientras se completa ── */}
+        <aside className="min-w-0">
+          <div className="space-y-4 xl:sticky xl:top-20">
+            <SaludSeo
+              avisos={avisos}
+              detalle={
+                <>
+                  Se muestra en la página <strong>Proyectos</strong>, en el mapa y en el inicio.
+                </>
+              }
+              textoListo="¡Todo listo! El proyecto está completo para mostrarse en la web."
+            />
           </div>
-          <div>
-            <label htmlFor="longitude" className="label">Longitud del marcador</label>
-            <input id="longitude" inputMode="decimal" value={form.longitude} onChange={(e) => actualizar('longitude', e.target.value)} onPaste={pegarCoordenadas} className="input font-mono" placeholder="-76.2567" />
-          </div>
-          <p className="hint -mt-3 sm:col-span-2">
-            En Google Maps haz clic derecho sobre el lugar y copia las coordenadas; pégalas aquí y se
-            llenan los dos campos. Si las dejas vacías, el marcador va al centro de la región.
-          </p>
-        </div>
-      </section>
+        </aside>
+      </div>
 
-      {/* ── Foto ── */}
-      <section className="card space-y-4 p-5">
-        <h3 className="text-sm font-bold text-brand-900">
-          Foto de portada <span className="text-red-500">*</span>
-        </h3>
-        <FotoConAlt
-          id="coverAlt"
-          media={form.coverImage}
-          alt={form.coverAlt ?? ''}
-          onMedia={(m) => actualizar('coverImage', m)}
-          onAlt={(alt) => actualizar('coverAlt', alt)}
-          placeholder="Canal de riego construido en la ladera de la comunidad"
-        />
-      </section>
-
-      {/* ── Orden y URL ── */}
-      <section className="card grid gap-5 p-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="position" className="label">Orden en la web</label>
-          <input id="position" type="number" min={0} value={form.position} onChange={(e) => actualizar('position', Number(e.target.value))} className="input" />
-          <p className="hint">Los 4 primeros salen en las tarjetas giratorias del inicio.</p>
-        </div>
-        <div>
-          <label htmlFor="slug" className="label">Identificador en la URL</label>
-          <input id="slug" value={form.slug} onChange={(e) => actualizar('slug', e.target.value)} className="input font-mono" placeholder="se genera del título" />
-          <p className="hint">/proyectos#{form.slug || 'titulo-del-proyecto'}</p>
-        </div>
-      </section>
+      <ConfirmModal
+        abierto={confirmando}
+        titulo={esNuevo ? '¿Crear este proyecto?' : '¿Guardar los cambios?'}
+        mensaje={
+          <>
+            <strong>{form.title}</strong>{' '}
+            {form.isPublished
+              ? esNuevo
+                ? 'se publicará en la web.'
+                : 'se actualizará en la web.'
+              : 'quedará guardado, pero oculto en la web.'}
+          </>
+        }
+        textoConfirmar={esNuevo ? 'Sí, crear' : 'Sí, guardar'}
+        tono={form.isPublished ? 'publicar' : 'aviso'}
+        ocupado={guardando}
+        onConfirmar={() => void guardar()}
+        onCancelar={() => setConfirmando(false)}
+      />
     </form>
   );
 }

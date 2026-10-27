@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-silver-100 text-brand-900 antialiased;
+    @apply bg-silver-100 text-slate-900 antialiased;
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
 
@@ -38,13 +38,13 @@
   }
 
   .input {
-    @apply w-full rounded-lg border border-silver-300 bg-white px-3.5 py-2.5 text-sm text-brand-900 transition-colors placeholder:text-slate-400 focus:border-brand-500;
+    @apply w-full rounded-lg border border-silver-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors placeholder:text-slate-500 focus:border-brand-500;
   }
   .label {
-    @apply mb-1.5 block text-sm font-semibold text-brand-800;
+    @apply mb-1.5 block text-sm font-bold text-slate-900;
   }
   .hint {
-    @apply mt-1.5 text-xs leading-relaxed text-slate-500;
+    @apply mt-1.5 text-xs leading-relaxed text-slate-700;
   }
 
   .badge {

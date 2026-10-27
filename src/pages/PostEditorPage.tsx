@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BlockEditor, SubidorArchivo } from '@/components/BlockEditor';
-import { SeoPanel } from '@/components/SeoPanel';
-import { ApiError, categoriesApi, postsApi, type PostPayload } from '@/lib/api';
+import {
+  Contador,
+  DESC_MAX,
+  DESC_MIN,
+  SeoPanel,
+  TITULO_MAX,
+  VistaGoogle,
+  textoParaGoogle,
+  tituloParaGoogle,
+} from '@/components/SeoPanel';
+import { ApiError, categoriesApi, postsApi, settingsApi, type PostPayload } from '@/lib/api';
+import { EncabezadoPaso, Paso } from '@/components/Paso';
 import { slugify } from '@/lib/format';
 import type { CategoryDTO, DraftBlock, MediaDTO, PostDTO, SeoAudit } from '@/lib/types';
 
@@ -10,6 +20,7 @@ const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'http://localhost:3000';
 
 type Formulario = {
   title: string;
+  /** Ya no se edita, pero se conserva si un artículo viejo lo tenía */
   subtitle: string;
   slug: string;
   excerpt: string;
@@ -22,7 +33,6 @@ type Formulario = {
   categoryId: string;
   tags: string;
   featured: boolean;
-  noindex: boolean;
 };
 
 const VACIO: Formulario = {
@@ -39,9 +49,14 @@ const VACIO: Formulario = {
   categoryId: '',
   tags: '',
   featured: false,
-  noindex: false,
 };
 
+/**
+ * Editor de artículos pensado para quien no sabe de programación ni de SEO:
+ * primero los datos generales, luego cómo se verá en Google y al final el
+ * artículo, sin nada que interrumpa la escritura. La dirección (URL) se
+ * arma sola con el título y todos los artículos se muestran en Google.
+ */
 export function PostEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -50,24 +65,33 @@ export function PostEditorPage() {
   const [form, setForm] = useState<Formulario>(VACIO);
   const [blocks, setBlocks] = useState<DraftBlock[]>([]);
   const [categorias, setCategorias] = useState<CategoryDTO[]>([]);
+  const [sitio, setSitio] = useState<{ nombre: string; logo: string | null }>({
+    nombre: 'ICGC',
+    logo: null,
+  });
   const [estado, setEstado] = useState<'DRAFT' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT');
   const [audit, setAudit] = useState<SeoAudit | null>(null);
   const [cargando, setCargando] = useState(!esNuevo);
   const [guardando, setGuardando] = useState(false);
-  const [slugTocado, setSlugTocado] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
-  const [pestana, setPestana] = useState<'contenido' | 'seo'>('contenido');
+  const [pestana, setPestana] = useState<'articulo' | 'revision'>('articulo');
 
   function actualizar<K extends keyof Formulario>(campo: K, valor: Formulario[K]) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }
 
-  // Categorías para el selector
+  // Categorías para el selector y el logo para la vista previa de Google
   useEffect(() => {
     categoriesApi
       .list()
       .then(setCategorias)
       .catch(() => setCategorias([]));
+    settingsApi
+      .get()
+      .then((s) => setSitio({ nombre: s.siteName, logo: s.logo?.url ?? null }))
+      .catch(() => {
+        // Sin ajustes, la vista previa usa las iniciales
+      });
   }, []);
 
   // Carga del artículo existente
@@ -81,7 +105,6 @@ export function PostEditorPage() {
         setBlocks(aBloques(post));
         setEstado(post.status);
         setAudit(post.seo);
-        setSlugTocado(true);
       })
       .catch((err) =>
         setAviso({
@@ -92,13 +115,12 @@ export function PostEditorPage() {
       .finally(() => setCargando(false));
   }, [id, esNuevo]);
 
-  // El slug se deriva del título mientras el admin no lo edite a mano.
-  // Una vez publicado no se toca solo: cambiar la URL de un post indexado
-  // borra su posicionamiento acumulado.
+  // La dirección se arma sola con el título. Una vez publicado ya no cambia:
+  // cambiar la URL de un artículo que Google ya conoce le hace perder visitas.
   useEffect(() => {
-    if (slugTocado) return;
+    if (estado === 'PUBLISHED') return;
     setForm((prev) => ({ ...prev, slug: slugify(prev.title) }));
-  }, [form.title, slugTocado]);
+  }, [form.title, estado]);
 
   const guardar = useCallback(
     async (nuevoEstado: 'DRAFT' | 'PUBLISHED') => {
@@ -117,7 +139,8 @@ export function PostEditorPage() {
         coverAlt: form.coverAlt || null,
         categoryId: form.categoryId || null,
         featured: form.featured,
-        noindex: form.noindex,
+        // Todos los artículos se muestran en Google
+        noindex: false,
         status: nuevoEstado,
         tags: form.tags
           .split(',')
@@ -146,20 +169,19 @@ export function PostEditorPage() {
           tipo: 'ok',
           texto:
             nuevoEstado === 'PUBLISHED'
-              ? 'Artículo publicado. Ya aparece en la web pública.'
-              : 'Borrador guardado.',
+              ? '¡Listo! El artículo ya se ve en la web.'
+              : 'Borrador guardado. Todavía no se ve en la web.',
         });
 
         // Al crear, pasamos a la URL de edición para no duplicar el artículo
         if (esNuevo) navigate(`/blogs/${resultado.id}`, { replace: true });
       } catch (err) {
         if (err instanceof ApiError && err.details) {
-          const detalle = err.details as SeoAudit;
-          setAudit(detalle);
-          setPestana('seo');
+          setAudit(err.details as SeoAudit);
+          setPestana('revision');
           setAviso({
             tipo: 'error',
-            texto: 'No se pudo publicar: revisa los puntos marcados en el panel de SEO.',
+            texto: 'Todavía no se puede publicar: en "Revisión" te decimos qué falta.',
           });
         } else {
           setAviso({
@@ -183,6 +205,10 @@ export function PostEditorPage() {
     );
   }
 
+  const dominio = SITE_URL.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const tituloGoogle = tituloParaGoogle(form.title, form.metaTitle);
+  const textoGoogle = textoParaGoogle(form.metaDescription, form.excerpt, blocks);
+
   return (
     <div className="space-y-5">
       {/* ── Barra de acciones ── */}
@@ -192,12 +218,15 @@ export function PostEditorPage() {
         </button>
 
         <div className="min-w-0">
-          <h2 className="truncate text-base font-bold text-brand-900">
+          <h2 className="truncate text-lg font-extrabold text-slate-900">
             {esNuevo ? 'Nuevo blog' : form.title || 'Sin título'}
           </h2>
-          <p className="text-xs text-slate-500">
-            {estado === 'PUBLISHED' ? 'Publicado' : estado === 'DRAFT' ? 'Borrador' : 'Archivado'}
-            {form.slug && ` · /blog/${form.slug}`}
+          <p className="text-sm font-semibold text-slate-800">
+            {estado === 'PUBLISHED'
+              ? 'Publicado: se ve en la web'
+              : estado === 'DRAFT'
+                ? 'Borrador: todavía no se ve en la web'
+                : 'Archivado'}
           </p>
         </div>
 
@@ -226,7 +255,7 @@ export function PostEditorPage() {
             onClick={() => void guardar('PUBLISHED')}
             className="btn-primary"
           >
-            {estado === 'PUBLISHED' ? 'Actualizar publicación' : 'Publicar'}
+            {estado === 'PUBLISHED' ? 'Guardar cambios' : 'Publicar'}
           </button>
         </div>
       </div>
@@ -234,8 +263,8 @@ export function PostEditorPage() {
       {aviso && (
         <p
           role="alert"
-          className={`rounded-lg px-4 py-3 text-sm ${
-            aviso.tipo === 'ok' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'
+          className={`rounded-lg px-4 py-3 text-sm font-medium ${
+            aviso.tipo === 'ok' ? 'bg-green-50 text-green-900' : 'bg-red-50 text-red-800'
           }`}
         >
           {aviso.texto}
@@ -244,30 +273,30 @@ export function PostEditorPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         {/* ── Columna principal ── */}
-        <div className="space-y-5">
-          {/* Pestañas (solo hasta xl; arriba de eso el panel SEO va al costado) */}
+        <div className="min-w-0 space-y-5">
+          {/* Pestañas (solo hasta xl; arriba de eso la revisión va al costado) */}
           <div className="flex gap-1.5 xl:hidden">
-            {(['contenido', 'seo'] as const).map((p) => (
+            {(['articulo', 'revision'] as const).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPestana(p)}
                 aria-pressed={pestana === p}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-                  pestana === p ? 'bg-brand-600 text-white' : 'bg-white text-brand-700'
+                className={`rounded-lg px-4 py-2 text-sm font-bold ${
+                  pestana === p ? 'bg-brand-600 text-white' : 'bg-white text-slate-900'
                 }`}
               >
-                {p === 'contenido' ? 'Contenido' : 'SEO'}
+                {p === 'articulo' ? 'Artículo' : 'Revisión'}
               </button>
             ))}
           </div>
 
-          <div className={pestana === 'seo' ? 'hidden xl:block' : ''}>
-            {/* ── Datos principales ── */}
-            <section className="card space-y-5 p-5">
+          <div className={`space-y-5 ${pestana === 'revision' ? 'hidden xl:block' : ''}`}>
+            {/* ── Paso 1: datos generales ── */}
+            <Paso numero={1} titulo="Datos generales">
               <div>
                 <label htmlFor="titulo" className="label">
-                  Título del artículo <span className="text-red-500">*</span>
+                  Título del artículo <span className="text-red-600">*</span>
                 </label>
                 <input
                   id="titulo"
@@ -275,233 +304,210 @@ export function PostEditorPage() {
                   value={form.title}
                   onChange={(e) => actualizar('title', e.target.value)}
                   placeholder="Qué es la gestión comunal y por qué importa"
-                  className="input text-lg font-semibold"
+                  className="input text-lg font-bold"
                 />
-                <p className="hint">
-                  Es el H1 de la página. Incluye la palabra clave principal lo más al inicio
-                  posible.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="subtitulo" className="label">
-                  Subtítulo (opcional)
-                </label>
-                <input
-                  id="subtitulo"
-                  type="text"
-                  value={form.subtitle}
-                  onChange={(e) => actualizar('subtitle', e.target.value)}
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="slug" className="label">
-                  URL del artículo
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0 text-sm text-slate-400">/blog/</span>
-                  <input
-                    id="slug"
-                    type="text"
-                    value={form.slug}
-                    onChange={(e) => {
-                      setSlugTocado(true);
-                      actualizar('slug', slugify(e.target.value));
-                    }}
-                    className="input font-mono text-sm"
-                  />
-                </div>
-                <p className="hint">
-                  {estado === 'PUBLISHED'
-                    ? 'Cuidado: este artículo ya está publicado. Cambiar la URL hace que Google pierda lo que tenía indexado.'
-                    : 'Se genera sola a partir del título. Mantenla corta y con la palabra clave.'}
-                </p>
+                {form.slug && (
+                  <p className="hint">
+                    Dirección en la web:{' '}
+                    <span className="font-semibold text-slate-900">
+                      {dominio}/blog/{form.slug}
+                    </span>
+                  </p>
+                )}
               </div>
 
               <div>
                 <label htmlFor="resumen" className="label">
-                  Resumen <span className="text-red-500">*</span>
+                  Resumen <span className="font-medium text-slate-700">(opcional)</span>
                 </label>
                 <textarea
                   id="resumen"
-                  rows={3}
+                  rows={2}
                   value={form.excerpt}
                   onChange={(e) => actualizar('excerpt', e.target.value)}
-                  placeholder="Dos o tres líneas que resuman el artículo."
+                  placeholder="Dos o tres líneas que cuenten de qué trata el artículo."
                   className="input resize-y"
                 />
                 <p className="hint">
-                  Se muestra en el listado del blog y al compartir el enlace en redes.
+                  Se ve en la lista del blog y al compartir el enlace. Si lo dejas vacío, usamos el
+                  primer párrafo.
                 </p>
               </div>
-            </section>
 
-            {/* ── Portada ── */}
-            <section className="card mt-5 space-y-4 p-5">
-              <h3 className="text-sm font-bold text-brand-900">
-                Imagen de portada <span className="text-red-500">*</span>
-              </h3>
+              {/* Portada con su descripción justo debajo; al lado, la clasificación */}
+              <div className="grid gap-5 rounded-xl border border-silver-200 bg-silver-100/60 p-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <p className="label">
+                    Imagen de portada <span className="text-red-600">*</span>
+                  </p>
+                  <SubidorArchivo
+                    kind="IMAGE"
+                    media={form.coverImage}
+                    onUploaded={(media) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        coverImage: media,
+                        coverImageId: media.id,
+                        coverAlt: prev.coverAlt || media.alt || '',
+                      }))
+                    }
+                    onClear={() =>
+                      setForm((prev) => ({ ...prev, coverImage: null, coverImageId: null }))
+                    }
+                  />
+                  <div>
+                    <label htmlFor="coverAlt" className="label">
+                      ¿Qué se ve en la imagen? <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      id="coverAlt"
+                      type="text"
+                      value={form.coverAlt}
+                      onChange={(e) => actualizar('coverAlt', e.target.value)}
+                      placeholder="Dirigentes comunales durante un taller"
+                      className="input"
+                    />
+                    <p className="hint">
+                      Una frase corta. Google la lee porque no puede ver fotos.
+                    </p>
+                  </div>
+                </div>
 
-              <SubidorArchivo
-                kind="IMAGE"
-                media={form.coverImage}
-                onUploaded={(media) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    coverImage: media,
-                    coverImageId: media.id,
-                    coverAlt: prev.coverAlt || media.alt || '',
-                  }))
-                }
-                onClear={() =>
-                  setForm((prev) => ({ ...prev, coverImage: null, coverImageId: null }))
-                }
-              />
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="categoria" className="label">
+                      Categoría
+                    </label>
+                    <select
+                      id="categoria"
+                      value={form.categoryId}
+                      onChange={(e) => actualizar('categoryId', e.target.value)}
+                      className="input"
+                    >
+                      <option value="">Sin categoría</option>
+                      {categorias.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div>
-                <label htmlFor="coverAlt" className="label">
-                  Texto alternativo de la portada <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="coverAlt"
-                  type="text"
-                  value={form.coverAlt}
-                  onChange={(e) => actualizar('coverAlt', e.target.value)}
-                  placeholder="Dirigentes comunales durante un taller de capacitación"
-                  className="input"
-                />
-              </div>
-            </section>
+                  <div>
+                    <label htmlFor="etiquetas" className="label">
+                      Etiquetas <span className="font-medium text-slate-700">(opcional)</span>
+                    </label>
+                    <input
+                      id="etiquetas"
+                      type="text"
+                      value={form.tags}
+                      onChange={(e) => actualizar('tags', e.target.value)}
+                      placeholder="asamblea, libro de actas, padrón"
+                      className="input"
+                    />
+                    <p className="hint">Separadas por comas.</p>
+                  </div>
 
-            {/* ── Contenido ── */}
-            <section className="mt-5">
-              <h3 className="mb-3 text-sm font-bold text-brand-900">Contenido del artículo</h3>
-              <BlockEditor blocks={blocks} onChange={setBlocks} />
-            </section>
-
-            {/* ── Clasificación ── */}
-            <section className="card mt-5 space-y-5 p-5">
-              <h3 className="text-sm font-bold text-brand-900">Clasificación</h3>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="categoria" className="label">
-                    Categoría
+                  <label className="flex items-center gap-2.5 text-sm font-semibold text-slate-900">
+                    <input
+                      type="checkbox"
+                      checked={form.featured}
+                      onChange={(e) => actualizar('featured', e.target.checked)}
+                      className="h-4 w-4 rounded border-silver-300 text-brand-600"
+                    />
+                    Destacar en la página de inicio
                   </label>
-                  <select
-                    id="categoria"
-                    value={form.categoryId}
-                    onChange={(e) => actualizar('categoryId', e.target.value)}
-                    className="input"
-                  >
-                    <option value="">Sin categoría</option>
-                    {categorias.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                </div>
+              </div>
+            </Paso>
+
+            {/* ── Paso 2: cómo se verá en Google ── */}
+            <Paso
+              numero={2}
+              titulo="Cómo aparecerá en Google"
+              descripcion="Todo es opcional: si lo dejas vacío, usamos el título y el resumen."
+            >
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="focusKeyword" className="label">
+                      ¿Cómo te buscaría la gente?
+                    </label>
+                    <input
+                      id="focusKeyword"
+                      type="text"
+                      value={form.focusKeyword}
+                      onChange={(e) => actualizar('focusKeyword', e.target.value)}
+                      placeholder="gestión comunal"
+                      className="input"
+                    />
+                    <p className="hint">Las palabras que escribirían en Google para encontrarte.</p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label htmlFor="metaTitle" className="label">
+                        Título en Google
+                      </label>
+                      <Contador actual={tituloGoogle.length} max={TITULO_MAX} />
+                    </div>
+                    <input
+                      id="metaTitle"
+                      type="text"
+                      value={form.metaTitle}
+                      onChange={(e) => actualizar('metaTitle', e.target.value)}
+                      placeholder={
+                        form.title ? `${form.title} | ICGC` : 'Se usa el título del artículo'
+                      }
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label htmlFor="metaDescription" className="label">
+                        Texto debajo del título
+                      </label>
+                      <Contador actual={textoGoogle.length} min={DESC_MIN} max={DESC_MAX} />
+                    </div>
+                    <textarea
+                      id="metaDescription"
+                      rows={3}
+                      value={form.metaDescription}
+                      onChange={(e) => actualizar('metaDescription', e.target.value)}
+                      placeholder={form.excerpt || 'Se usa el resumen del artículo'}
+                      className="input resize-y"
+                    />
+                    <p className="hint">Escríbelo para que den ganas de hacer clic.</p>
+                  </div>
                 </div>
 
                 <div>
-                  <label htmlFor="etiquetas" className="label">
-                    Etiquetas
-                  </label>
-                  <input
-                    id="etiquetas"
-                    type="text"
-                    value={form.tags}
-                    onChange={(e) => actualizar('tags', e.target.value)}
-                    placeholder="asamblea, libro de actas, padrón"
-                    className="input"
+                  <p className="label">Así se vería en Google</p>
+                  <VistaGoogle
+                    titulo={tituloGoogle}
+                    descripcion={textoGoogle}
+                    slug={form.slug}
+                    busqueda={form.focusKeyword}
+                    nombreSitio={sitio.nombre}
+                    logoUrl={sitio.logo}
                   />
-                  <p className="hint">Separadas por comas.</p>
                 </div>
               </div>
+            </Paso>
 
-              <div className="flex flex-wrap gap-6">
-                <label className="flex items-center gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.featured}
-                    onChange={(e) => actualizar('featured', e.target.checked)}
-                    className="h-4 w-4 rounded border-silver-300 text-brand-600"
-                  />
-                  Destacar en la página de inicio
-                </label>
-
-                <label className="flex items-center gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.noindex}
-                    onChange={(e) => actualizar('noindex', e.target.checked)}
-                    className="h-4 w-4 rounded border-silver-300 text-brand-600"
-                  />
-                  No indexar en Google (noindex)
-                </label>
-              </div>
-            </section>
-
-            {/* ── Metadatos SEO ── */}
-            <section className="card mt-5 space-y-5 p-5">
-              <h3 className="text-sm font-bold text-brand-900">Metadatos para Google</h3>
-
-              <div>
-                <label htmlFor="focusKeyword" className="label">
-                  Palabra clave objetivo
-                </label>
-                <input
-                  id="focusKeyword"
-                  type="text"
-                  value={form.focusKeyword}
-                  onChange={(e) => actualizar('focusKeyword', e.target.value)}
-                  placeholder="gestión comunal"
-                  className="input"
-                />
-                <p className="hint">
-                  La búsqueda por la que quieres aparecer. Se revisa que esté en el título, la URL
-                  y la descripción.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="metaTitle" className="label">
-                  Título SEO
-                </label>
-                <input
-                  id="metaTitle"
-                  type="text"
-                  value={form.metaTitle}
-                  onChange={(e) => actualizar('metaTitle', e.target.value)}
-                  placeholder={form.title ? `${form.title} | ICGC` : 'Se usa el título del artículo'}
-                  className="input"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="metaDescription" className="label">
-                  Meta descripción <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  id="metaDescription"
-                  rows={3}
-                  value={form.metaDescription}
-                  onChange={(e) => actualizar('metaDescription', e.target.value)}
-                  className="input resize-y"
-                />
-                <p className="hint">
-                  Es el texto que aparece bajo el título en los resultados de Google. Escríbelo
-                  para que inviten a hacer clic.
-                </p>
+            {/* ── Paso 3: el artículo, sin interrupciones ── */}
+            <section>
+              <EncabezadoPaso numero={3} titulo="Escribe el artículo" />
+              <div className="mt-3">
+                <BlockEditor blocks={blocks} onChange={setBlocks} />
               </div>
             </section>
           </div>
         </div>
 
-        {/* ── Panel SEO ── */}
-        <aside className={pestana === 'contenido' ? 'hidden xl:block' : ''}>
+        {/* ── Revisión ── */}
+        <aside className={pestana === 'articulo' ? 'hidden xl:block' : ''}>
           <div className="xl:sticky xl:top-20">
             <SeoPanel
               title={form.title}
@@ -539,7 +545,6 @@ function aFormulario(post: PostDTO): Formulario {
     categoryId: post.category?.id ?? '',
     tags: post.tags.map((t) => t.name).join(', '),
     featured: post.featured,
-    noindex: post.noindex,
   };
 }
 

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BotonEditar, BotonEliminar, BotonVer, BotonVisibilidad } from '@/components/BotonesAccion';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { coursesApi } from '@/lib/api';
 import type { CourseDTO } from '@/lib/types';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'http://localhost:3000';
+
+type Accion = { tipo: 'publicar' | 'ocultar' | 'eliminar'; curso: CourseDTO };
 
 /**
  * Listado de cursos. Lo que se publique aquí aparece en /cursos y en el
@@ -12,6 +16,8 @@ const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'http://localhost:3000';
 export function CoursesPage() {
   const [cursos, setCursos] = useState<CourseDTO[] | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [accion, setAccion] = useState<Accion | null>(null);
+  const [procesando, setProcesando] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -25,28 +31,31 @@ export function CoursesPage() {
     void cargar();
   }, [cargar]);
 
-  async function alternarPublicado(curso: CourseDTO) {
+  async function confirmar() {
+    if (!accion) return;
+    const { tipo, curso } = accion;
+    setProcesando(true);
     setAviso(null);
     try {
-      await coursesApi.update(curso.id, { isPublished: !curso.isPublished });
-      setAviso({
-        tipo: 'ok',
-        texto: curso.isPublished ? 'Curso ocultado de la web' : 'Curso publicado en la web',
-      });
+      if (tipo === 'eliminar') {
+        await coursesApi.remove(curso.id);
+        setAviso({ tipo: 'ok', texto: `Se eliminó "${curso.name}".` });
+      } else {
+        await coursesApi.update(curso.id, { isPublished: tipo === 'publicar' });
+        setAviso({
+          tipo: 'ok',
+          texto:
+            tipo === 'publicar'
+              ? `"${curso.name}" ya se ve en la web.`
+              : `"${curso.name}" ya no se ve en la web.`,
+        });
+      }
       await cargar();
     } catch (err) {
-      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo cambiar' });
-    }
-  }
-
-  async function eliminar(curso: CourseDTO) {
-    if (!window.confirm(`¿Eliminar definitivamente el curso "${curso.name}" y su foto?`)) return;
-    try {
-      await coursesApi.remove(curso.id);
-      setAviso({ tipo: 'ok', texto: 'Curso eliminado' });
-      await cargar();
-    } catch (err) {
-      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo eliminar' });
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo completar' });
+    } finally {
+      setAccion(null);
+      setProcesando(false);
     }
   }
 
@@ -55,7 +64,7 @@ export function CoursesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-brand-900">Cursos de capacitación</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-700">
             {cursos ? `${cursos.length} curso(s) · se muestran en /cursos y en el inicio` : 'Cargando...'}
           </p>
         </div>
@@ -98,9 +107,9 @@ export function CoursesPage() {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-silver-100">
                   {curso.coverImage ? (
-                    <img src={curso.coverImage.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <img src={curso.coverImage.thumbUrl ?? curso.coverImage.url} alt="" loading="lazy" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-400">
+                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-600">
                       SIN FOTO
                     </div>
                   )}
@@ -121,42 +130,77 @@ export function CoursesPage() {
                     )}
                   </div>
                   <h3 className="mt-1.5 truncate text-base font-bold text-brand-900">{curso.name}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 text-xs text-slate-700">
                     {curso.lectiveHours} h lectivas · {curso.duration} · {curso.modality} ·{' '}
                     {curso.topics.length} tema(s)
                   </p>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <Link to={`/cursos/${curso.id}`} className="btn-secondary btn-sm">
-                    Editar
-                  </Link>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <BotonEditar to={`/cursos/${curso.id}`} etiqueta={`Editar "${curso.name}"`} />
                   {curso.isPublished && (
-                    <a
-                      href={`${SITE_URL}/cursos#${curso.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-ghost btn-sm"
-                    >
-                      Ver ↗
-                    </a>
+                    <BotonVer href={`${SITE_URL}/cursos/${curso.slug}`} etiqueta={`Ver "${curso.name}" en la web`} />
                   )}
-                  <button type="button" onClick={() => void alternarPublicado(curso)} className="btn-ghost btn-sm">
-                    {curso.isPublished ? 'Ocultar' : 'Publicar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void eliminar(curso)}
-                    className="btn-sm btn text-red-600 hover:bg-red-50"
-                  >
-                    Eliminar
-                  </button>
+                  <BotonVisibilidad
+                    publicado={curso.isPublished}
+                    etiqueta={curso.isPublished ? `Ocultar "${curso.name}"` : `Publicar "${curso.name}"`}
+                    onClick={() => setAccion({ tipo: curso.isPublished ? 'ocultar' : 'publicar', curso })}
+                  />
+                  <BotonEliminar
+                    etiqueta={`Eliminar "${curso.name}"`}
+                    onClick={() => setAccion({ tipo: 'eliminar', curso })}
+                  />
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      <ConfirmModal
+        abierto={accion !== null}
+        ocupado={procesando}
+        onCancelar={() => setAccion(null)}
+        onConfirmar={() => void confirmar()}
+        {...textosDelModal(accion)}
+      />
     </div>
   );
+}
+
+function textosDelModal(accion: Accion | null) {
+  const nombre = accion ? <strong className="text-slate-900">“{accion.curso.name}”</strong> : null;
+
+  switch (accion?.tipo) {
+    case 'publicar':
+      return {
+        tono: 'publicar' as const,
+        titulo: '¿Publicar este curso?',
+        textoConfirmar: 'Publicar',
+        mensaje: <>{nombre} se verá en la página de cursos y en el inicio.</>,
+      };
+    case 'ocultar':
+      return {
+        tono: 'aviso' as const,
+        titulo: '¿Ocultar este curso?',
+        textoConfirmar: 'Ocultar',
+        mensaje: (
+          <>
+            {nombre} dejará de verse en la web. No se borra: puedes volver a publicarlo cuando
+            quieras.
+          </>
+        ),
+      };
+    default:
+      return {
+        tono: 'peligro' as const,
+        titulo: '¿Eliminar este curso?',
+        textoConfirmar: 'Sí, eliminar',
+        mensaje: (
+          <>
+            {nombre} y su foto se borrarán para siempre. <strong>Esto no se puede deshacer.</strong>
+          </>
+        ),
+      };
+  }
 }

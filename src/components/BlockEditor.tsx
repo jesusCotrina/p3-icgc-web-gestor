@@ -23,7 +23,7 @@ export function nuevoBloque(type: BlockType): DraftBlock {
 
 const TIPOS: { type: BlockType; etiqueta: string; descripcion: string }[] = [
   { type: 'PARAGRAPH', etiqueta: 'Párrafo', descripcion: 'Texto del artículo' },
-  { type: 'HEADING', etiqueta: 'Subtítulo', descripcion: 'H2 o H3 — estructura el contenido' },
+  { type: 'HEADING', etiqueta: 'Subtítulo', descripcion: 'Para separar el texto por temas' },
   { type: 'IMAGE', etiqueta: 'Imagen', descripcion: `Hasta ${MAX_IMAGE_MB} MB` },
   { type: 'VIDEO', etiqueta: 'Video', descripcion: `Hasta ${MAX_VIDEO_MB} MB` },
   { type: 'LIST', etiqueta: 'Lista', descripcion: 'Viñetas o numerada' },
@@ -83,7 +83,7 @@ export function BlockEditor({
   return (
     <div className="space-y-4">
       {blocks.length === 0 && (
-        <p className="rounded-xl border border-dashed border-silver-300 p-10 text-center text-sm text-slate-500">
+        <p className="rounded-xl border border-dashed border-silver-300 p-10 text-center text-sm text-slate-700">
           El artículo está vacío. Agrega el primer bloque con los botones de abajo.
         </p>
       )}
@@ -101,7 +101,7 @@ export function BlockEditor({
                 onClick={() => mover(index, -1)}
                 disabled={index === 0}
                 aria-label="Mover bloque hacia arriba"
-                className="rounded px-2 py-1 text-sm text-slate-500 hover:bg-silver-200 disabled:opacity-30"
+                className="rounded px-2 py-1 text-sm text-slate-700 hover:bg-silver-200 disabled:opacity-30"
               >
                 ↑
               </button>
@@ -110,7 +110,7 @@ export function BlockEditor({
                 onClick={() => mover(index, 1)}
                 disabled={index === blocks.length - 1}
                 aria-label="Mover bloque hacia abajo"
-                className="rounded px-2 py-1 text-sm text-slate-500 hover:bg-silver-200 disabled:opacity-30"
+                className="rounded px-2 py-1 text-sm text-slate-700 hover:bg-silver-200 disabled:opacity-30"
               >
                 ↓
               </button>
@@ -145,7 +145,7 @@ export function BlockEditor({
               className="rounded-lg border border-silver-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-brand-400 hover:bg-brand-50"
             >
               <span className="block text-sm font-semibold text-brand-800">{tipo.etiqueta}</span>
-              <span className="mt-0.5 block text-xs text-slate-500">{tipo.descripcion}</span>
+              <span className="mt-0.5 block text-xs text-slate-700">{tipo.descripcion}</span>
             </button>
           ))}
         </div>
@@ -188,11 +188,11 @@ function CuerpoBloque({
           <select
             value={block.level}
             onChange={(e) => onChange({ level: Number(e.target.value) })}
-            aria-label="Nivel del subtítulo"
-            className="input w-28 shrink-0"
+            aria-label="Tamaño del subtítulo"
+            className="input w-32 shrink-0"
           >
-            <option value={2}>H2</option>
-            <option value={3}>H3</option>
+            <option value={2}>Grande</option>
+            <option value={3}>Mediano</option>
           </select>
           <input
             type="text"
@@ -202,8 +202,7 @@ function CuerpoBloque({
             className="input min-w-0 flex-1"
           />
           <p className="hint w-full">
-            El H1 es el título del artículo. Dentro del contenido usa H2 y, si necesitas
-            subdividir, H3.
+            Usa "Grande" para cada tema nuevo y "Mediano" para dividir un tema en partes.
           </p>
         </div>
       );
@@ -340,7 +339,7 @@ function CuerpoBloque({
       return (
         <div className="flex items-center gap-3 py-2">
           <hr className="flex-1 border-silver-300" />
-          <span className="text-xs text-slate-400">Separador visual</span>
+          <span className="text-xs text-slate-600">Separador visual</span>
           <hr className="flex-1 border-silver-300" />
         </div>
       );
@@ -427,7 +426,7 @@ export function SubidorArchivo({
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-brand-900">{media.originalName}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-700">
             {formatBytes(media.sizeBytes)}
             {media.width && media.height ? ` · ${media.width}×${media.height} px` : ''}
           </p>
@@ -477,7 +476,7 @@ export function SubidorArchivo({
           <span className="text-sm font-semibold text-brand-700">
             {kind === 'IMAGE' ? 'Seleccionar imagen' : 'Seleccionar video'}
           </span>
-          <span className="mt-1 text-xs text-slate-500">
+          <span className="mt-1 text-xs text-slate-700">
             {kind === 'IMAGE' ? 'JPG, PNG, WebP o AVIF' : 'MP4, WebM o MOV'} · máximo {maxMb} MB
           </span>
           <input

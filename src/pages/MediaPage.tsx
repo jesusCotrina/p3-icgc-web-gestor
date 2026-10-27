@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { SubidorArchivo } from '@/components/BlockEditor';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { mediaApi } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format';
 import type { MediaDTO, Paginated } from '@/lib/types';
@@ -16,6 +16,8 @@ export function MediaPage() {
   const [cargando, setCargando] = useState(true);
   const [seleccionado, setSeleccionado] = useState<MediaDTO | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [porEliminar, setPorEliminar] = useState<MediaDTO | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -23,7 +25,7 @@ export function MediaPage() {
       const result = await mediaApi.list({
         kind: filtro === 'TODOS' ? undefined : filtro,
         page: pagina,
-        pageSize: 24,
+        pageSize: 20,
       });
       setDatos(result);
     } catch (err) {
@@ -41,16 +43,10 @@ export function MediaPage() {
   }, [cargar]);
 
   async function eliminar(media: MediaDTO) {
-    if (
-      !window.confirm(
-        `¿Eliminar "${media.originalName}"? Si algún artículo lo usa, quedará sin ese archivo.`,
-      )
-    ) {
-      return;
-    }
-
+    setEliminando(true);
     try {
       await mediaApi.remove(media.id);
+      setPorEliminar(null);
       setSeleccionado(null);
       setAviso({ tipo: 'ok', texto: 'Archivo eliminado del servidor' });
       await cargar();
@@ -59,6 +55,9 @@ export function MediaPage() {
         tipo: 'error',
         texto: err instanceof Error ? err.message : 'No se pudo eliminar',
       });
+      setPorEliminar(null);
+    } finally {
+      setEliminando(false);
     }
   }
 
@@ -76,15 +75,13 @@ export function MediaPage() {
     }
   }
 
-  const totalBytes = datos?.items.reduce((suma, m) => suma + m.sizeBytes, 0) ?? 0;
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-brand-900">Archivos del servidor</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {datos ? `${datos.total} archivo(s) · ${formatBytes(totalBytes)} en esta página` : '...'}
+          <h2 className="text-lg font-bold text-slate-900">Imágenes y videos</h2>
+          <p className="mt-0.5 text-sm text-slate-700">
+            {datos ? `${datos.total} archivo(s), del más reciente al más antiguo` : '...'}
           </p>
         </div>
 
@@ -114,31 +111,6 @@ export function MediaPage() {
         </div>
       </div>
 
-      {/* Subida suelta: útil para dejar archivos listos antes de escribir */}
-      <section className="card p-5">
-        <h3 className="mb-3 text-sm font-bold text-brand-900">Subir un archivo nuevo</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          <SubidorArchivo
-            kind="IMAGE"
-            media={null}
-            onUploaded={() => {
-              setAviso({ tipo: 'ok', texto: 'Imagen subida' });
-              void cargar();
-            }}
-            onClear={() => undefined}
-          />
-          <SubidorArchivo
-            kind="VIDEO"
-            media={null}
-            onUploaded={() => {
-              setAviso({ tipo: 'ok', texto: 'Video subido' });
-              void cargar();
-            }}
-            onClear={() => undefined}
-          />
-        </div>
-      </section>
-
       {aviso && (
         <p
           role="alert"
@@ -151,50 +123,60 @@ export function MediaPage() {
       )}
 
       {cargando && !datos ? (
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          {Array.from({ length: 12 }, (_, i) => (
-            <div key={i} className="card aspect-square animate-pulse" />
+        <div className="card divide-y divide-silver-200">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="h-16 animate-pulse" />
           ))}
         </div>
       ) : datos && datos.items.length > 0 ? (
         <>
-          <ul className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {/* Lista liviana: cada fila carga una miniatura de ~15 KB, no la foto original */}
+          <ul className="card divide-y divide-silver-200 overflow-hidden">
             {datos.items.map((media) => (
               <li key={media.id}>
                 <button
                   type="button"
                   onClick={() => setSeleccionado(media)}
-                  className="card group w-full overflow-hidden text-left transition-shadow hover:shadow-md"
+                  className="flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-brand-50"
                 >
-                  <div className="aspect-square bg-silver-100">
-                    {media.kind === 'IMAGE' ? (
+                  <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-silver-100">
+                    {media.kind === 'IMAGE' && media.thumbUrl ? (
                       <img
-                        src={media.url}
-                        alt={media.alt ?? ''}
+                        src={media.thumbUrl}
+                        alt=""
                         loading="lazy"
+                        decoding="async"
+                        width={64}
+                        height={48}
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-2 bg-brand-900 text-white">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                          <polygon points="5 3 19 12 5 21 5 3" />
+                      <span className="flex h-full w-full items-center justify-center bg-brand-900 text-white">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <polygon points="6 4 20 12 6 20 6 4" />
                         </svg>
-                        <span className="text-[0.65rem] font-semibold">VIDEO</span>
-                      </div>
+                      </span>
                     )}
-                  </div>
+                  </span>
 
-                  <div className="p-2.5">
-                    <p className="truncate text-xs font-semibold text-brand-900">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-slate-900">
                       {media.originalName}
-                    </p>
-                    <p className="mt-0.5 text-[0.65rem] text-slate-500">
-                      {formatBytes(media.sizeBytes)}
-                    </p>
-                    {media.kind === 'IMAGE' && !media.alt && (
-                      <p className="mt-1 text-[0.65rem] font-semibold text-amber-600">Falta alt</p>
-                    )}
-                  </div>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-700">
+                      {media.kind === 'IMAGE' ? 'Imagen' : 'Video'} · {formatBytes(media.sizeBytes)}
+                      {media.width && media.height ? ` · ${media.width}×${media.height}` : ''}
+                    </span>
+                  </span>
+
+                  {media.kind === 'IMAGE' && !media.alt && (
+                    <span className="badge hidden bg-amber-100 text-amber-900 sm:inline-flex">
+                      Sin descripción
+                    </span>
+                  )}
+                  <span className="hidden shrink-0 text-xs font-semibold text-slate-700 md:block">
+                    Subido el {formatDate(media.createdAt)}
+                  </span>
                 </button>
               </li>
             ))}
@@ -238,9 +220,25 @@ export function MediaPage() {
           media={seleccionado}
           onClose={() => setSeleccionado(null)}
           onSave={guardarTextos}
-          onDelete={eliminar}
+          onDelete={async (m) => setPorEliminar(m)}
         />
       )}
+
+      <ConfirmModal
+        abierto={porEliminar !== null}
+        tono="peligro"
+        titulo="¿Eliminar este archivo?"
+        mensaje={
+          <>
+            <strong>{porEliminar?.originalName}</strong> se borrará del servidor. Si algún artículo,
+            curso o proyecto lo usa, quedará sin ese archivo. <strong>No se puede deshacer.</strong>
+          </>
+        }
+        textoConfirmar="Sí, eliminar"
+        ocupado={eliminando}
+        onConfirmar={() => porEliminar && void eliminar(porEliminar)}
+        onCancelar={() => setPorEliminar(null)}
+      />
     </div>
   );
 }
@@ -284,7 +282,7 @@ function DetalleArchivo({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-lg px-3 py-1 text-slate-500 hover:bg-silver-100"
+            className="rounded-lg px-3 py-1 text-slate-700 hover:bg-silver-100"
           >
             ✕
           </button>
@@ -385,7 +383,7 @@ function DetalleArchivo({
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">{etiqueta}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wider text-slate-700">{etiqueta}</dt>
       <dd className="mt-0.5 truncate text-brand-900" title={valor}>
         {valor}
       </dd>

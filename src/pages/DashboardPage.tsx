@@ -1,8 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { dashboardApi } from '@/lib/api';
+import {
+  IconoCalendario,
+  IconoDisco,
+  IconoDocumento,
+  IconoImagen,
+  IconoMemoria,
+  IconoOjo,
+  IconoProcesador,
+  IconoServidor,
+} from '@/components/Iconos';
+import { API_URL, dashboardApi } from '@/lib/api';
 import { formatBytes, formatDateTime, formatNumber, formatUptime } from '@/lib/format';
 import type { DashboardStatsDTO, ServerStatsDTO } from '@/lib/types';
+
+/** Dominio donde vive el sistema (el de la API), sin "https://". */
+const DOMINIO = (() => {
+  try {
+    return new URL(API_URL).host;
+  } catch {
+    return API_URL;
+  }
+})();
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardStatsDTO | null>(null);
@@ -63,7 +82,7 @@ export function DashboardPage() {
     return (
       <div className="card p-10 text-center">
         <h2 className="text-lg font-bold">No se pudieron cargar las estadísticas</h2>
-        <p className="mt-2 text-sm text-slate-600">{error}</p>
+        <p className="mt-2 text-sm text-slate-800">{error}</p>
         <button type="button" onClick={() => void cargar()} className="btn-primary mt-6">
           Reintentar
         </button>
@@ -73,13 +92,15 @@ export function DashboardPage() {
 
   const { content, recentPosts } = data;
   const stats = server ?? data.server;
+  const sistema = stats.os.isWindows ? 'Windows' : stats.os.isLinux ? 'Linux' : stats.os.platform;
+  const hayDisco = stats.disk.totalBytes > 0;
 
   return (
     <div className="space-y-8">
       {/* ── Publicaciones ── */}
       <section aria-labelledby="resumen-contenido">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="resumen-contenido" className="text-base font-bold text-brand-900">
+          <h2 id="resumen-contenido" className="text-lg font-extrabold text-slate-900">
             Publicaciones
           </h2>
           <Link to="/blogs/nuevo" className="btn-primary btn-sm">
@@ -89,24 +110,28 @@ export function DashboardPage() {
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            etiqueta="Publicaciones totales"
+            icono={<IconoDocumento />}
+            etiqueta="Artículos"
             valor={formatNumber(content.totalPosts)}
-            detalle={`${content.published} publicadas · ${content.drafts} borradores`}
+            detalle={`${content.published} publicados · ${content.drafts} borradores`}
             tono="brand"
           />
           <StatCard
-            etiqueta="Publicadas este mes"
+            icono={<IconoCalendario />}
+            etiqueta="Publicados este mes"
             valor={formatNumber(content.publishedThisMonth)}
-            detalle={`${content.categories} categorías · ${content.tags} etiquetas`}
+            detalle={`${content.categories} categorías`}
             tono="green"
           />
           <StatCard
-            etiqueta="Visitas acumuladas"
+            icono={<IconoOjo />}
+            etiqueta="Visitas"
             valor={formatNumber(content.totalViews)}
-            detalle="Lecturas de artículos en la web"
-            tono="brand"
+            detalle="Lecturas de los artículos"
+            tono="violet"
           />
           <StatCard
+            icono={<IconoImagen />}
             etiqueta="Archivos subidos"
             valor={formatNumber(content.mediaCount)}
             detalle={`${content.imagesCount} imágenes · ${content.videosCount} videos`}
@@ -115,83 +140,83 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* ── Servidor ── */}
+      {/* ── Servidor: una sola tarjeta con secciones separadas ── */}
       <section aria-labelledby="estado-servidor">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="estado-servidor" className="text-base font-bold text-brand-900">
+          <h2 id="estado-servidor" className="text-lg font-extrabold text-slate-900">
             Estado del servidor
           </h2>
-          <p className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" aria-hidden="true" />
-            Se actualiza cada 10 segundos
+          <p className="flex items-center gap-2 text-sm font-semibold text-green-700">
+            <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+            </span>
+            En línea
           </p>
         </div>
 
-        {/* Sistema operativo detectado: lo decide el backend según process.platform */}
-        <div className="card mt-4 flex flex-wrap items-center gap-x-8 gap-y-3 p-5 text-sm">
-          <span className="badge bg-brand-50 text-brand-700">
-            {stats.os.isWindows ? 'Windows' : stats.os.isLinux ? 'Linux' : stats.os.platform}
-          </span>
-          <Dato etiqueta="Sistema" valor={stats.os.prettyName} />
-          <Dato etiqueta="Equipo" valor={stats.os.hostname} />
-          <Dato etiqueta="Arquitectura" valor={stats.os.arch} />
-          <Dato etiqueta="Encendido hace" valor={formatUptime(stats.os.uptimeSec)} />
-          <Dato etiqueta="Node" valor={stats.runtime.node} />
-        </div>
+        <div className="card mt-4 grid divide-y divide-silver-200 md:grid-cols-2 md:divide-y-0 xl:grid-cols-4 xl:divide-x">
+          <Bloque icono={<IconoServidor />} titulo="Sistema" tono="brand">
+            <p className="text-2xl font-extrabold text-slate-900">{sistema}</p>
+            <dl className="mt-3 space-y-1.5 text-sm">
+              <Fila etiqueta="Dominio" valor={DOMINIO} />
+              <Fila etiqueta="Encendido hace" valor={formatUptime(stats.os.uptimeSec)} />
+            </dl>
+          </Bloque>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-          {/* CPU */}
-          <GaugeCard
+          <Bloque
+            icono={<IconoProcesador />}
             titulo="Procesador"
+            tono="violet"
             porcentaje={stats.cpu.usagePercent}
-            principal={`${stats.cpu.cores} núcleos`}
-            lineas={[
-              stats.cpu.model,
-              `${(stats.cpu.speedMhz / 1000).toFixed(2)} GHz`,
-              stats.cpu.loadAvg
-                ? `Carga media: ${stats.cpu.loadAvg.map((n) => n.toFixed(2)).join(' · ')}`
-                : 'Carga media: no disponible en Windows',
-            ]}
-          />
+            className="md:border-l md:border-silver-200 xl:border-l-0"
+          >
+            <p className="text-sm font-semibold text-slate-800">{stats.cpu.cores} núcleos</p>
+          </Bloque>
 
-          {/* RAM */}
-          <GaugeCard
-            titulo="Memoria RAM"
+          <Bloque
+            icono={<IconoMemoria />}
+            titulo="Memoria"
+            tono="green"
             porcentaje={stats.memory.usedPercent}
-            principal={`${formatBytes(stats.memory.usedBytes)} / ${formatBytes(stats.memory.totalBytes)}`}
-            lineas={[
-              `Libre: ${formatBytes(stats.memory.freeBytes)}`,
-              `Proceso del backend: ${formatBytes(stats.runtime.processMemoryBytes)}`,
-            ]}
-          />
+            className="md:border-t md:border-silver-200 xl:border-t-0"
+          >
+            <p className="text-sm font-semibold text-slate-800">
+              {formatBytes(stats.memory.usedBytes)} de {formatBytes(stats.memory.totalBytes)}
+            </p>
+          </Bloque>
 
-          {/* Disco */}
-          <GaugeCard
+          <Bloque
+            icono={<IconoDisco />}
             titulo="Almacenamiento"
-            porcentaje={stats.disk.usedPercent}
-            principal={
-              stats.disk.totalBytes > 0
-                ? `${formatBytes(stats.disk.freeBytes)} disponibles`
-                : 'No disponible'
-            }
-            lineas={[
-              stats.disk.totalBytes > 0
-                ? `${formatBytes(stats.disk.usedBytes)} usados de ${formatBytes(stats.disk.totalBytes)}`
-                : 'El servidor no reportó el espacio en disco',
-              `Ruta medida: ${stats.disk.path}`,
-              `Archivos subidos: ${formatBytes(content.uploadsSizeBytes)}`,
-            ]}
-          />
+            tono="amber"
+            porcentaje={hayDisco ? stats.disk.usedPercent : undefined}
+            className="md:border-l md:border-t md:border-silver-200 xl:border-l-0 xl:border-t-0"
+          >
+            {hayDisco ? (
+              <dl className="space-y-1.5 text-sm">
+                <Fila etiqueta="Libre" valor={formatBytes(stats.disk.freeBytes)} />
+                <Fila
+                  etiqueta="Usado"
+                  valor={`${formatBytes(stats.disk.usedBytes)} de ${formatBytes(stats.disk.totalBytes)}`}
+                />
+                <Fila etiqueta="Tus archivos" valor={formatBytes(content.uploadsSizeBytes)} />
+              </dl>
+            ) : (
+              <p className="text-sm font-semibold text-slate-800">No disponible</p>
+            )}
+          </Bloque>
         </div>
+        <p className="mt-2 text-xs font-medium text-slate-700">Se actualiza cada 10 segundos.</p>
       </section>
 
       {/* ── Últimos artículos ── */}
       <section aria-labelledby="ultimos">
         <div className="flex items-center justify-between gap-3">
-          <h2 id="ultimos" className="text-base font-bold text-brand-900">
+          <h2 id="ultimos" className="text-lg font-extrabold text-slate-900">
             Últimos artículos editados
           </h2>
-          <Link to="/blogs" className="text-sm font-semibold text-brand-600 hover:text-brand-800">
+          <Link to="/blogs" className="text-sm font-bold text-brand-700 hover:text-brand-900">
             Ver todos
           </Link>
         </div>
@@ -207,21 +232,21 @@ export function DashboardPage() {
                 <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-silver-100">
                   {post.coverImage ? (
                     <img
-                      src={post.coverImage.url}
+                      src={post.coverImage.thumbUrl ?? post.coverImage.url}
                       alt=""
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-400">
+                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-600">
                       SIN PORTADA
                     </div>
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-brand-900">{post.title}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="truncate font-bold text-slate-900">{post.title}</p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-700">
                     Editado el {formatDateTime(post.updatedAt)}
                   </p>
                 </div>
@@ -231,7 +256,7 @@ export function DashboardPage() {
             ))
           ) : (
             <div className="p-10 text-center">
-              <p className="text-slate-600">Todavía no hay artículos.</p>
+              <p className="font-medium text-slate-800">Todavía no hay artículos.</p>
               <Link to="/blogs/nuevo" className="btn-primary mt-5">
                 Crear el primer blog
               </Link>
@@ -245,96 +270,127 @@ export function DashboardPage() {
 
 // ───────────────────────────── Piezas ─────────────────────────────
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <span className="text-slate-600">
-      <span className="font-semibold text-brand-800">{etiqueta}:</span> {valor}
-    </span>
-  );
-}
-
 const TONOS = {
-  brand: 'bg-brand-50 text-brand-700',
-  green: 'bg-green-50 text-green-700',
-  amber: 'bg-amber-50 text-amber-700',
+  brand: { caja: 'bg-brand-100 text-brand-700', detalle: 'bg-brand-50 text-brand-800' },
+  green: { caja: 'bg-green-100 text-green-700', detalle: 'bg-green-50 text-green-800' },
+  violet: { caja: 'bg-violet-100 text-violet-700', detalle: 'bg-violet-50 text-violet-800' },
+  amber: { caja: 'bg-amber-100 text-amber-700', detalle: 'bg-amber-50 text-amber-800' },
 } as const;
 
+type Tono = keyof typeof TONOS;
+
 function StatCard({
+  icono,
   etiqueta,
   valor,
   detalle,
   tono,
 }: {
+  icono: React.ReactNode;
   etiqueta: string;
   valor: string;
   detalle: string;
-  tono: keyof typeof TONOS;
+  tono: Tono;
 }) {
   return (
-    <article className="card p-5">
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{etiqueta}</p>
-      <p className="mt-2 text-3xl font-extrabold text-brand-900">{valor}</p>
-      <p className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${TONOS[tono]}`}>
-        {detalle}
-      </p>
+    <article className="card flex items-start gap-4 p-5">
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${TONOS[tono].caja}`}
+      >
+        {icono}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-slate-800">{etiqueta}</p>
+        <p className="mt-0.5 text-3xl font-extrabold text-slate-900">{valor}</p>
+        <p
+          className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${TONOS[tono].detalle}`}
+        >
+          {detalle}
+        </p>
+      </div>
     </article>
   );
 }
 
-/** Tarjeta con barra de uso. El color avisa cuando el recurso se está agotando. */
-function GaugeCard({
+/** Una sección de la tarjeta del servidor. Con porcentaje, muestra la barra de uso. */
+function Bloque({
+  icono,
   titulo,
+  tono,
   porcentaje,
-  principal,
-  lineas,
+  className = '',
+  children,
 }: {
+  icono: React.ReactNode;
   titulo: string;
-  porcentaje: number;
-  principal: string;
-  lineas: string[];
+  tono: Tono;
+  porcentaje?: number;
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const color =
-    porcentaje >= 90 ? 'bg-red-500' : porcentaje >= 75 ? 'bg-amber-500' : 'bg-brand-500';
+  // El color avisa cuando el recurso se está agotando
+  const barra =
+    porcentaje === undefined
+      ? ''
+      : porcentaje >= 90
+        ? 'bg-red-500'
+        : porcentaje >= 75
+          ? 'bg-amber-500'
+          : 'bg-brand-600';
 
   return (
-    <article className="card p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-bold text-brand-900">{titulo}</h3>
-        <span className="text-lg font-extrabold text-brand-700">{porcentaje.toFixed(1)}%</span>
+    <article className={`p-5 ${className}`}>
+      <div className="flex items-center gap-3">
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONOS[tono].caja}`}
+        >
+          {icono}
+        </span>
+        <h3 className="text-base font-extrabold text-slate-900">{titulo}</h3>
+        {porcentaje !== undefined && (
+          <span className="ml-auto text-2xl font-extrabold text-slate-900">
+            {Math.round(porcentaje)}%
+          </span>
+        )}
       </div>
 
-      <p className="mt-1 text-sm font-semibold text-slate-700">{principal}</p>
-
-      <div
-        className="mt-3 h-2 w-full overflow-hidden rounded-full bg-silver-200"
-        role="progressbar"
-        aria-valuenow={Math.round(porcentaje)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Uso de ${titulo.toLowerCase()}`}
-      >
+      {porcentaje !== undefined && (
         <div
-          className={`h-full rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${Math.min(100, Math.max(0, porcentaje))}%` }}
-        />
-      </div>
+          className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-silver-200"
+          role="progressbar"
+          aria-valuenow={Math.round(porcentaje)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Uso de ${titulo.toLowerCase()}`}
+        >
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barra}`}
+            style={{ width: `${Math.min(100, Math.max(0, porcentaje))}%` }}
+          />
+        </div>
+      )}
 
-      <ul className="mt-3 space-y-1 text-xs leading-relaxed text-slate-500">
-        {lineas.map((linea) => (
-          <li key={linea} className="truncate" title={linea}>
-            {linea}
-          </li>
-        ))}
-      </ul>
+      <div className="mt-3">{children}</div>
     </article>
+  );
+}
+
+function Fila({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="font-medium text-slate-700">{etiqueta}</dt>
+      <dd className="truncate text-right font-bold text-slate-900" title={valor}>
+        {valor}
+      </dd>
+    </div>
   );
 }
 
 export function EstadoBadge({ status }: { status: string }) {
   const mapa: Record<string, { texto: string; clase: string }> = {
-    PUBLISHED: { texto: 'Publicado', clase: 'bg-green-50 text-green-700' },
-    DRAFT: { texto: 'Borrador', clase: 'bg-amber-50 text-amber-700' },
-    ARCHIVED: { texto: 'Archivado', clase: 'bg-silver-200 text-slate-600' },
+    PUBLISHED: { texto: 'Publicado', clase: 'bg-green-100 text-green-800' },
+    DRAFT: { texto: 'Borrador', clase: 'bg-amber-100 text-amber-800' },
+    ARCHIVED: { texto: 'Archivado', clase: 'bg-silver-200 text-slate-800' },
   };
   const item = mapa[status] ?? mapa.DRAFT!;
 
@@ -349,11 +405,7 @@ function SkeletonDashboard() {
           <div key={i} className="card h-32 animate-pulse" />
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="card h-44 animate-pulse" />
-        ))}
-      </div>
+      <div className="card h-44 animate-pulse" />
       <span className="sr-only">Cargando...</span>
     </div>
   );

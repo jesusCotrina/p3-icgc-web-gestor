@@ -40,7 +40,7 @@ export function LoginPage() {
             alt="Logo del Instituto de Capacitacion en Gestion Comunal"
             width={88}
             height={88}
-            className="mx-auto h-22 w-22 rounded-full bg-white object-contain p-1 shadow-lg"
+            className="mx-auto h-22 w-22 object-contain drop-shadow-lg"
           />
           <h1 className="mt-5 text-2xl font-bold text-white">Gestor ICGC</h1>
           <p className="mt-1.5 text-sm text-brand-200">Panel de administracion del sitio</p>

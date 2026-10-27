@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BotonEditar, BotonEliminar, BotonVer, BotonVisibilidad } from '@/components/BotonesAccion';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { projectsApi } from '@/lib/api';
 import { PERU_REGIONS, PROJECT_STATUS_LABELS, type ProjectDTO } from '@/lib/types';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'http://localhost:3000';
+
+type Accion = { tipo: 'publicar' | 'ocultar' | 'eliminar'; proyecto: ProjectDTO };
 
 const nombreRegion = (id: string) => PERU_REGIONS.find((r) => r.id === id)?.name ?? id;
 
@@ -14,6 +18,8 @@ const nombreRegion = (id: string) => PERU_REGIONS.find((r) => r.id === id)?.name
 export function ProjectsPage() {
   const [proyectos, setProyectos] = useState<ProjectDTO[] | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [accion, setAccion] = useState<Accion | null>(null);
+  const [procesando, setProcesando] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -27,25 +33,31 @@ export function ProjectsPage() {
     void cargar();
   }, [cargar]);
 
-  async function alternarPublicado(p: ProjectDTO) {
+  async function confirmar() {
+    if (!accion) return;
+    const { tipo, proyecto } = accion;
+    setProcesando(true);
     setAviso(null);
     try {
-      await projectsApi.update(p.id, { isPublished: !p.isPublished });
-      setAviso({ tipo: 'ok', texto: p.isPublished ? 'Proyecto ocultado de la web' : 'Proyecto publicado en la web' });
+      if (tipo === 'eliminar') {
+        await projectsApi.remove(proyecto.id);
+        setAviso({ tipo: 'ok', texto: `Se eliminó "${proyecto.title}".` });
+      } else {
+        await projectsApi.update(proyecto.id, { isPublished: tipo === 'publicar' });
+        setAviso({
+          tipo: 'ok',
+          texto:
+            tipo === 'publicar'
+              ? `"${proyecto.title}" ya se ve en la web.`
+              : `"${proyecto.title}" ya no se ve en la web.`,
+        });
+      }
       await cargar();
     } catch (err) {
-      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo cambiar' });
-    }
-  }
-
-  async function eliminar(p: ProjectDTO) {
-    if (!window.confirm(`¿Eliminar definitivamente el proyecto "${p.title}" y su foto?`)) return;
-    try {
-      await projectsApi.remove(p.id);
-      setAviso({ tipo: 'ok', texto: 'Proyecto eliminado' });
-      await cargar();
-    } catch (err) {
-      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo eliminar' });
+      setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo completar' });
+    } finally {
+      setAccion(null);
+      setProcesando(false);
     }
   }
 
@@ -59,7 +71,7 @@ export function ProjectsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-brand-900">Proyectos</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-700">
             {proyectos ? `${proyectos.length} proyecto(s)` : 'Cargando...'}
           </p>
         </div>
@@ -77,10 +89,10 @@ export function ProjectsPage() {
           ].map((c) => (
             <div key={c.etiqueta} className="card p-4">
               <p className="text-2xl font-black text-brand-700">{c.valor}</p>
-              <p className="text-xs text-slate-500">{c.etiqueta}</p>
+              <p className="text-xs text-slate-700">{c.etiqueta}</p>
             </div>
           ))}
-          <p className="text-xs text-slate-500 sm:col-span-3">
+          <p className="text-xs text-slate-700 sm:col-span-3">
             Estas cifras se muestran en el hero de la página de inicio y en el mapa “Nuestra huella
             en el Perú”. Se calculan solas a partir de los proyectos publicados.
           </p>
@@ -121,9 +133,9 @@ export function ProjectsPage() {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-silver-100">
                   {p.coverImage ? (
-                    <img src={p.coverImage.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <img src={p.coverImage.thumbUrl ?? p.coverImage.url} alt="" loading="lazy" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-400">
+                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-600">
                       SIN FOTO
                     </div>
                   )}
@@ -138,33 +150,76 @@ export function ProjectsPage() {
                     <span className="badge bg-brand-50 text-brand-700">{nombreRegion(p.region)}</span>
                   </div>
                   <h3 className="mt-1.5 truncate text-base font-bold text-brand-900">{p.title}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 text-xs text-slate-700">
                     {p.communitiesBenefited} comunidad(es) · {p.achievements.length} logro(s) · orden {p.position}
                     {p.latitude == null && ' · sin coordenadas (marcador en el centro de la región)'}
                   </p>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <Link to={`/proyectos/${p.id}`} className="btn-secondary btn-sm">
-                    Editar
-                  </Link>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <BotonEditar to={`/proyectos/${p.id}`} etiqueta={`Editar "${p.title}"`} />
                   {p.isPublished && (
-                    <a href={`${SITE_URL}/proyectos#${p.slug}`} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">
-                      Ver ↗
-                    </a>
+                    <BotonVer href={`${SITE_URL}/proyectos#${p.slug}`} etiqueta={`Ver "${p.title}" en la web`} />
                   )}
-                  <button type="button" onClick={() => void alternarPublicado(p)} className="btn-ghost btn-sm">
-                    {p.isPublished ? 'Ocultar' : 'Publicar'}
-                  </button>
-                  <button type="button" onClick={() => void eliminar(p)} className="btn-sm btn text-red-600 hover:bg-red-50">
-                    Eliminar
-                  </button>
+                  <BotonVisibilidad
+                    publicado={p.isPublished}
+                    etiqueta={p.isPublished ? `Ocultar "${p.title}"` : `Publicar "${p.title}"`}
+                    onClick={() => setAccion({ tipo: p.isPublished ? 'ocultar' : 'publicar', proyecto: p })}
+                  />
+                  <BotonEliminar
+                    etiqueta={`Eliminar "${p.title}"`}
+                    onClick={() => setAccion({ tipo: 'eliminar', proyecto: p })}
+                  />
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
+      <ConfirmModal
+        abierto={accion !== null}
+        ocupado={procesando}
+        onCancelar={() => setAccion(null)}
+        onConfirmar={() => void confirmar()}
+        {...textosDelModal(accion)}
+      />
     </div>
   );
+}
+
+function textosDelModal(accion: Accion | null) {
+  const nombre = accion ? <strong className="text-slate-900">“{accion.proyecto.title}”</strong> : null;
+
+  switch (accion?.tipo) {
+    case 'publicar':
+      return {
+        tono: 'publicar' as const,
+        titulo: '¿Publicar este proyecto?',
+        textoConfirmar: 'Publicar',
+        mensaje: <>{nombre} se verá en la página de proyectos, en el mapa y en el inicio.</>,
+      };
+    case 'ocultar':
+      return {
+        tono: 'aviso' as const,
+        titulo: '¿Ocultar este proyecto?',
+        textoConfirmar: 'Ocultar',
+        mensaje: (
+          <>
+            {nombre} dejará de verse en la web. No se borra: puedes volver a publicarlo cuando
+            quieras.
+          </>
+        ),
+      };
+    default:
+      return {
+        tono: 'peligro' as const,
+        titulo: '¿Eliminar este proyecto?',
+        textoConfirmar: 'Sí, eliminar',
+        mensaje: (
+          <>
+            {nombre} y su foto se borrarán para siempre. <strong>Esto no se puede deshacer.</strong>
+          </>
+        ),
+      };
+  }
 }

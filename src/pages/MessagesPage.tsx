@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BotonEliminar } from '@/components/BotonesAccion';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { contactMessagesApi } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import type { ContactMessageDTO } from '@/lib/types';
@@ -11,6 +13,8 @@ import type { ContactMessageDTO } from '@/lib/types';
 export function MessagesPage() {
   const [mensajes, setMensajes] = useState<ContactMessageDTO[] | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const [porEliminar, setPorEliminar] = useState<ContactMessageDTO | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = useCallback(async () => {
     try {
@@ -34,13 +38,16 @@ export function MessagesPage() {
   }
 
   async function eliminar(mensaje: ContactMessageDTO) {
-    if (!window.confirm(`¿Eliminar definitivamente el mensaje de ${mensaje.firstName} ${mensaje.lastName}?`)) return;
+    setEliminando(true);
     try {
       await contactMessagesApi.remove(mensaje.id);
       setMensajes((prev) => prev?.filter((m) => m.id !== mensaje.id) ?? prev);
       setAviso({ tipo: 'ok', texto: 'Mensaje eliminado' });
     } catch (err) {
       setAviso({ tipo: 'error', texto: err instanceof Error ? err.message : 'No se pudo eliminar' });
+    } finally {
+      setPorEliminar(null);
+      setEliminando(false);
     }
   }
 
@@ -50,7 +57,7 @@ export function MessagesPage() {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-bold text-brand-900">Mensajes de contacto</h2>
-        <p className="mt-0.5 text-sm text-slate-500">
+        <p className="mt-0.5 text-sm text-slate-700">
           {mensajes
             ? `${mensajes.length} mensaje(s) · ${sinLeer} sin leer · llegan desde el formulario de /nosotros`
             : 'Cargando...'}
@@ -97,7 +104,7 @@ export function MessagesPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {!m.readAt && <span className="badge bg-brand-600 text-white">Nuevo</span>}
-                      <span className="text-xs text-slate-500">{formatDateTime(m.createdAt)}</span>
+                      <span className="text-xs text-slate-700">{formatDateTime(m.createdAt)}</span>
                     </div>
                     <h3 className="mt-1.5 text-base font-bold text-brand-900">
                       {m.firstName} {m.lastName}
@@ -122,13 +129,11 @@ export function MessagesPage() {
                     </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button type="button" onClick={() => void marcar(m, !m.readAt)} className="btn-secondary px-3 py-1.5 text-xs">
                       {m.readAt ? 'Marcar como no leído' : 'Marcar como leído'}
                     </button>
-                    <button type="button" onClick={() => void eliminar(m)} className="btn-secondary px-3 py-1.5 text-xs text-red-600">
-                      Eliminar
-                    </button>
+                    <BotonEliminar etiqueta={`Eliminar el mensaje de ${m.firstName} ${m.lastName}`} onClick={() => setPorEliminar(m)} />
                   </div>
                 </div>
 
@@ -142,6 +147,25 @@ export function MessagesPage() {
           })}
         </ul>
       )}
+
+      <ConfirmModal
+        abierto={porEliminar !== null}
+        tono="peligro"
+        titulo="¿Eliminar este mensaje?"
+        mensaje={
+          <>
+            El mensaje de{' '}
+            <strong>
+              {porEliminar?.firstName} {porEliminar?.lastName}
+            </strong>{' '}
+            se borrará para siempre. <strong>No se puede deshacer.</strong>
+          </>
+        }
+        textoConfirmar="Sí, eliminar"
+        ocupado={eliminando}
+        onConfirmar={() => porEliminar && void eliminar(porEliminar)}
+        onCancelar={() => setPorEliminar(null)}
+      />
     </div>
   );
 }

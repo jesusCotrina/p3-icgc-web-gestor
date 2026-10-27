@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi, projectsApi, settingsApi, uploadFile, type UploadProgress } from '@/lib/api';
 import { formatBytes } from '@/lib/format';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { FotoConAlt } from '@/components/FotoConAlt';
+import { Paso } from '@/components/Paso';
 import type { CareerItem, SiteSettingsDTO } from '@/lib/types';
 
 /**
@@ -16,6 +18,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<SiteSettingsDTO | null>(null);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [progreso, setProgreso] = useState<UploadProgress | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const inputLogo = useRef<HTMLInputElement>(null);
@@ -52,8 +55,7 @@ export function SettingsPage() {
     setSettings((prev) => (prev ? { ...prev, [campo]: valor } : prev));
   }
 
-  async function guardar(event: React.FormEvent) {
-    event.preventDefault();
+  async function guardar() {
     if (!settings) return;
 
     setGuardando(true);
@@ -91,8 +93,10 @@ export function SettingsPage() {
       });
 
       setSettings(actualizado);
+      setConfirmando(false);
       setAviso({ tipo: 'ok', texto: 'Ajustes guardados. La web pública los tomará en 1 minuto.' });
     } catch (err) {
+      setConfirmando(false);
       setAviso({
         tipo: 'error',
         texto: err instanceof Error ? err.message : 'No se pudieron guardar los ajustes',
@@ -157,273 +161,394 @@ export function SettingsPage() {
     );
   }
 
+  const SECCIONES = [
+    { id: 'cifras', titulo: 'Cifras del inicio' },
+    { id: 'identidad', titulo: 'Logo y nombre' },
+    { id: 'contacto', titulo: 'Contacto y WhatsApp' },
+    { id: 'redes', titulo: 'Redes sociales' },
+    { id: 'lider', titulo: 'Líder del instituto' },
+    { id: 'google', titulo: 'Google' },
+  ];
+
   return (
-    <form onSubmit={guardar} className="max-w-4xl space-y-5">
-      {aviso && (
-        <p
-          role="alert"
-          className={`rounded-lg px-4 py-3 text-sm ${
-            aviso.tipo === 'ok' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'
-          }`}
-        >
-          {aviso.texto}
-        </p>
-      )}
-
-      {/* ── Logo ── */}
-      <section className="card p-5">
-        <h2 className="text-sm font-bold text-brand-900">Logo de la empresa</h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Se usa en la cabecera, el pie, el icono del navegador y las tarjetas que se ven al
-          compartir el sitio en redes.
-        </p>
-
-        <div className="mt-4 flex flex-wrap items-center gap-5">
-          <img
-            src={settings.logo?.url ?? '/logo-icgc.png'}
-            alt={settings.logoAlt}
-            className="h-24 w-24 rounded-full border border-silver-200 bg-white object-contain p-1"
-          />
-
-          <div className="min-w-0 flex-1">
-            {progreso ? (
-              <div>
-                <p className="text-sm font-semibold text-brand-800">
-                  Subiendo... {progreso.percent}%
-                </p>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-silver-200">
-                  <div
-                    className="h-full bg-brand-600 transition-all"
-                    style={{ width: `${progreso.percent}%` }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <label className="btn-secondary cursor-pointer">
-                  Cambiar logo
-                  <input
-                    ref={inputLogo}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    onChange={subirLogo}
-                    className="sr-only"
-                  />
-                </label>
-                {settings.logo && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    {settings.logo.originalName} · {formatBytes(settings.logo.sizeBytes)}
-                    {settings.logo.width && ` · ${settings.logo.width}×${settings.logo.height} px`}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <label htmlFor="logoAlt" className="label">
-            Texto alternativo del logo
-          </label>
-          <input
-            id="logoAlt"
-            type="text"
-            value={settings.logoAlt}
-            onChange={(e) => actualizar('logoAlt', e.target.value)}
-            className="input"
-          />
-        </div>
-      </section>
-
-      {/* ── Identidad y SEO global ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Identidad del sitio</h2>
-
-        <Campo
-          id="siteName"
-          etiqueta="Nombre del sitio"
-          valor={settings.siteName}
-          onChange={(v) => actualizar('siteName', v)}
-          ayuda="Aparece en el título de las páginas y en el schema Organization."
-        />
-
-        <Campo
-          id="tagline"
-          etiqueta="Lema"
-          valor={settings.tagline}
-          onChange={(v) => actualizar('tagline', v)}
-        />
-
-        <div>
-          <label htmlFor="defaultMetaDescription" className="label">
-            Meta descripción por defecto
-          </label>
-          <textarea
-            id="defaultMetaDescription"
-            rows={3}
-            value={settings.defaultMetaDescription}
-            onChange={(e) => actualizar('defaultMetaDescription', e.target.value)}
-            className="input resize-y"
-          />
-          <p className="hint">
-            {settings.defaultMetaDescription.length} caracteres. Lo ideal son 120-160. Es lo que
-            Google muestra en las páginas que no tienen descripción propia.
-          </p>
-        </div>
-
-        <Campo
-          id="siteUrl"
-          etiqueta="URL pública del sitio"
-          valor={settings.siteUrl}
-          onChange={(v) => actualizar('siteUrl', v)}
-          ayuda="Debe ser el dominio final (https://...). Se usa en las URLs canónicas y el sitemap."
-        />
-      </section>
-
-      {/* ── Contacto ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Datos de contacto</h2>
-        <p className="-mt-3 text-xs text-slate-500">
-          Alimentan el bloque de contacto de Nosotros, el pie del sitio y los datos estructurados que Google
-          puede mostrar en el panel de conocimiento.
-        </p>
-
-        {!settings.whatsapp?.trim() && (
-          <p className="rounded-lg bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800">
-            <strong>Falta el número de WhatsApp.</strong> Mientras esté vacío, los botones
-            &quot;Solicitar información&quot;, &quot;Ver cursos&quot; y &quot;Quiero asesoría&quot;
-            de la web llevan al formulario de contacto en lugar de abrir WhatsApp.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setConfirmando(true);
+      }}
+      className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]"
+    >
+      <div className="min-w-0 space-y-5">
+        {aviso && (
+          <p
+            role="alert"
+            className={`rounded-lg px-4 py-3 text-sm font-semibold ${
+              aviso.tipo === 'ok' ? 'bg-green-50 text-green-900' : 'bg-red-50 text-red-800'
+            }`}
+          >
+            {aviso.texto}
           </p>
         )}
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Campo id="email" etiqueta="Correo" valor={settings.email ?? ''} onChange={(v) => actualizar('email', v || null)} tipo="email" />
-          <Campo id="phone" etiqueta="Teléfono" valor={settings.phone ?? ''} onChange={(v) => actualizar('phone', v || null)} />
-          <Campo id="whatsapp" etiqueta="WhatsApp" valor={settings.whatsapp ?? ''} onChange={(v) => actualizar('whatsapp', v || null)} ayuda="Con código de país y sin espacios, p. ej. 51987654321. Es el número al que llevan todos los botones de la web." />
-          <Campo id="address" etiqueta="Dirección" valor={settings.address ?? ''} onChange={(v) => actualizar('address', v || null)} />
-          <Campo id="city" etiqueta="Ciudad" valor={settings.city ?? ''} onChange={(v) => actualizar('city', v || null)} />
-          <Campo id="country" etiqueta="País" valor={settings.country ?? ''} onChange={(v) => actualizar('country', v || null)} />
-        </div>
-      </section>
+        {/* ── 1. Lo primero que se ve en la web ── */}
+        <Seccion
+          id="cifras"
+          numero={1}
+          titulo="Cifras de la página de inicio"
+          descripcion="Los tres números que se animan en la portada."
+        >
+          <div className="grid gap-5 sm:grid-cols-3">
+            <CampoNumero
+              id="yearsExperience"
+              etiqueta="Años de experiencia"
+              valor={settings.yearsExperience}
+              onChange={(v) => actualizar('yearsExperience', v)}
+              vistaPrevia={`+${settings.yearsExperience}`}
+            />
+            {/* Calculadas desde Proyectos: así coinciden con el mapa de la web */}
+            <CifraCalculada etiqueta="Proyectos asesorados" valor={cifras?.proyectos} />
+            <CifraCalculada etiqueta="Regiones atendidas" valor={cifras?.regiones} />
+          </div>
+          <p className="hint">
+            Los proyectos y las regiones se cuentan solos desde{' '}
+            <Link to="/proyectos" className="font-bold text-brand-700 hover:underline">
+              Proyectos
+            </Link>
+            .
+          </p>
+        </Seccion>
 
-      {/* ── Redes ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Redes sociales</h2>
-        <p className="-mt-3 text-xs text-slate-500">
-          Se publican como <code className="rounded bg-silver-100 px-1">sameAs</code> en el schema
-          Organization: así Google confirma que esos perfiles son del instituto.
-        </p>
+        {/* ── 2. Identidad ── */}
+        <Seccion
+          id="identidad"
+          numero={2}
+          titulo="Logo y nombre del instituto"
+          descripcion="Se ven en la cabecera, el pie, la pestaña del navegador y al compartir la web."
+        >
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="rounded-xl border border-silver-200 bg-silver-100/60 p-4">
+              <div className="flex items-center gap-4">
+                <img
+                  src={settings.logo?.url ?? '/logo-icgc.png'}
+                  alt={settings.logoAlt}
+                  className="h-20 w-20 shrink-0 rounded-full border border-silver-200 bg-white object-contain p-1"
+                />
+                <div className="min-w-0 flex-1">
+                  {progreso ? (
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">
+                        Subiendo... {progreso.percent}%
+                      </p>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-silver-200">
+                        <div
+                          className="h-full bg-brand-600 transition-all"
+                          style={{ width: `${progreso.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="btn-secondary btn-sm cursor-pointer">
+                        Cambiar logo
+                        <input
+                          ref={inputLogo}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                          onChange={subirLogo}
+                          className="sr-only"
+                        />
+                      </label>
+                      {settings.logo && (
+                        <p className="mt-2 truncate text-xs text-slate-700">
+                          {settings.logo.originalName} · {formatBytes(settings.logo.sizeBytes)}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4">
+                <Campo
+                  id="logoAlt"
+                  etiqueta="¿Qué se ve en el logo?"
+                  valor={settings.logoAlt}
+                  onChange={(v) => actualizar('logoAlt', v)}
+                />
+              </div>
+            </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Campo id="facebookUrl" etiqueta="Facebook" valor={settings.facebookUrl ?? ''} onChange={(v) => actualizar('facebookUrl', v || null)} tipo="url" />
-          <Campo id="instagramUrl" etiqueta="Instagram" valor={settings.instagramUrl ?? ''} onChange={(v) => actualizar('instagramUrl', v || null)} tipo="url" />
-          <Campo id="youtubeUrl" etiqueta="YouTube" valor={settings.youtubeUrl ?? ''} onChange={(v) => actualizar('youtubeUrl', v || null)} tipo="url" />
-          <Campo id="linkedinUrl" etiqueta="LinkedIn" valor={settings.linkedinUrl ?? ''} onChange={(v) => actualizar('linkedinUrl', v || null)} tipo="url" />
-          <Campo id="tiktokUrl" etiqueta="TikTok" valor={settings.tiktokUrl ?? ''} onChange={(v) => actualizar('tiktokUrl', v || null)} tipo="url" />
-        </div>
-      </section>
+            <div className="space-y-5">
+              <Campo
+                id="siteName"
+                etiqueta="Nombre del instituto"
+                valor={settings.siteName}
+                onChange={(v) => actualizar('siteName', v)}
+              />
+              <div>
+                <label htmlFor="tagline" className="label">
+                  Frase de presentación
+                </label>
+                <textarea
+                  id="tagline"
+                  rows={3}
+                  value={settings.tagline}
+                  onChange={(e) => actualizar('tagline', e.target.value)}
+                  className="input resize-y"
+                />
+                <p className="hint">Aparece debajo del título grande de la portada.</p>
+              </div>
+            </div>
+          </div>
+        </Seccion>
 
-      {/* ── Cifras del hero ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Cifras de la página de inicio</h2>
-        <p className="-mt-3 text-xs text-slate-500">
-          Son los tres números que se animan en la portada. Los años se escriben aquí; los
-          proyectos y las regiones se cuentan solos desde la sección{' '}
-          <Link to="/proyectos" className="font-semibold text-brand-600 hover:underline">Proyectos</Link>{' '}
-          y son los mismos que muestra el mapa “Nuestra huella en el Perú”.
-        </p>
+        {/* ── 3. Contacto ── */}
+        <Seccion
+          id="contacto"
+          numero={3}
+          titulo="Contacto y WhatsApp"
+          descripcion="Se muestran en Nosotros y en el pie de la web."
+        >
+          {!settings.whatsapp?.trim() && (
+            <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+              <strong>Falta el número de WhatsApp.</strong> Sin él, los botones de la web llevan
+              al formulario de contacto en vez de abrir WhatsApp.
+            </p>
+          )}
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Campo
+              id="whatsapp"
+              etiqueta="WhatsApp"
+              valor={settings.whatsapp ?? ''}
+              onChange={(v) => actualizar('whatsapp', v || null)}
+              ayuda="Con código de país, sin espacios: 51987654321"
+            />
+            <Campo
+              id="phone"
+              etiqueta="Teléfono"
+              valor={settings.phone ?? ''}
+              onChange={(v) => actualizar('phone', v || null)}
+            />
+            <Campo
+              id="email"
+              etiqueta="Correo"
+              valor={settings.email ?? ''}
+              onChange={(v) => actualizar('email', v || null)}
+              tipo="email"
+            />
+          </div>
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Campo
+              id="address"
+              etiqueta="Dirección"
+              valor={settings.address ?? ''}
+              onChange={(v) => actualizar('address', v || null)}
+            />
+            <Campo
+              id="city"
+              etiqueta="Ciudad"
+              valor={settings.city ?? ''}
+              onChange={(v) => actualizar('city', v || null)}
+            />
+            <Campo
+              id="country"
+              etiqueta="País"
+              valor={settings.country ?? ''}
+              onChange={(v) => actualizar('country', v || null)}
+            />
+          </div>
+        </Seccion>
 
-        <div className="grid gap-5 sm:grid-cols-3">
-          <CampoNumero
-            id="yearsExperience"
-            etiqueta="Años de experiencia"
-            valor={settings.yearsExperience}
-            onChange={(v) => actualizar('yearsExperience', v)}
-            vistaPrevia={`${settings.yearsExperience}`}
+        {/* ── 4. Redes ── */}
+        <Seccion
+          id="redes"
+          numero={4}
+          titulo="Redes sociales"
+          descripcion="Pega el enlace de cada perfil. Las que dejes vacías no se muestran."
+        >
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Campo id="facebookUrl" etiqueta="Facebook" valor={settings.facebookUrl ?? ''} onChange={(v) => actualizar('facebookUrl', v || null)} tipo="url" />
+            <Campo id="instagramUrl" etiqueta="Instagram" valor={settings.instagramUrl ?? ''} onChange={(v) => actualizar('instagramUrl', v || null)} tipo="url" />
+            <Campo id="youtubeUrl" etiqueta="YouTube" valor={settings.youtubeUrl ?? ''} onChange={(v) => actualizar('youtubeUrl', v || null)} tipo="url" />
+            <Campo id="linkedinUrl" etiqueta="LinkedIn" valor={settings.linkedinUrl ?? ''} onChange={(v) => actualizar('linkedinUrl', v || null)} tipo="url" />
+            <Campo id="tiktokUrl" etiqueta="TikTok" valor={settings.tiktokUrl ?? ''} onChange={(v) => actualizar('tiktokUrl', v || null)} tipo="url" />
+          </div>
+        </Seccion>
+
+        {/* ── 5. Líder ── */}
+        <Seccion
+          id="lider"
+          numero={5}
+          titulo="Líder o gerente general"
+          descripcion="Arma la franja “Sobre el líder” en la página Nosotros. Si dejas el nombre vacío, no se muestra."
+        >
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="rounded-xl border border-silver-200 bg-silver-100/60 p-4">
+              <p className="label">Foto</p>
+              <FotoConAlt
+                id="leaderPhotoAlt"
+                media={settings.leaderPhoto}
+                alt={settings.leaderPhotoAlt ?? ''}
+                onMedia={(m) => actualizar('leaderPhoto', m)}
+                onAlt={(alt) => actualizar('leaderPhotoAlt', alt)}
+                placeholder="Retrato del gerente general del ICGC"
+              />
+            </div>
+            <div className="space-y-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Campo
+                  id="leaderName"
+                  etiqueta="Nombre completo"
+                  valor={settings.leaderName ?? ''}
+                  onChange={(v) => actualizar('leaderName', v)}
+                />
+                <Campo
+                  id="leaderRole"
+                  etiqueta="Cargo"
+                  valor={settings.leaderRole ?? ''}
+                  onChange={(v) => actualizar('leaderRole', v)}
+                  ayuda="Por ejemplo: Gerente general"
+                />
+              </div>
+              <Campo
+                id="leaderHeadline"
+                etiqueta="Frase de título"
+                valor={settings.leaderHeadline ?? ''}
+                onChange={(v) => actualizar('leaderHeadline', v)}
+                ayuda="Opcional. Si está vacía, el título es el nombre."
+              />
+              <div>
+                <label htmlFor="leaderBio" className="label">
+                  Descripción
+                </label>
+                <textarea
+                  id="leaderBio"
+                  rows={5}
+                  value={settings.leaderBio ?? ''}
+                  onChange={(e) => actualizar('leaderBio', e.target.value)}
+                  className="input resize-y"
+                />
+                <p className="hint">Deja una línea en blanco para separar párrafos.</p>
+              </div>
+            </div>
+          </div>
+          <Trayectoria
+            pasos={settings.leaderCareer}
+            onChange={(pasos) => actualizar('leaderCareer', pasos)}
           />
-          {/* Calculadas desde Proyectos: así coinciden con el mapa de la web */}
-          <CifraCalculada etiqueta="Proyectos asesorados" valor={cifras?.proyectos} />
-          <CifraCalculada etiqueta="Regiones atendidas" valor={cifras?.regiones} />
-        </div>
-      </section>
+        </Seccion>
 
-      {/* ── Líder / gerente general ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Líder o gerente general</h2>
-        <p className="-mt-3 text-xs text-slate-500">
-          Arma la franja “Sobre el líder” y su trayectoria en la página Nosotros. Si dejas el
-          nombre vacío, la franja no se muestra. Google lo lee como la persona a cargo del
-          instituto (schema Person).
-        </p>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Campo id="leaderName" etiqueta="Nombre completo" valor={settings.leaderName ?? ''} onChange={(v) => actualizar('leaderName', v)} />
-          <Campo id="leaderRole" etiqueta="Cargo" valor={settings.leaderRole ?? ''} onChange={(v) => actualizar('leaderRole', v)} ayuda="Por ejemplo: Gerente general" />
-        </div>
-
-        <Campo
-          id="leaderHeadline"
-          etiqueta="Título de la franja"
-          valor={settings.leaderHeadline ?? ''}
-          onChange={(v) => actualizar('leaderHeadline', v)}
-          ayuda="Una frase corta. Si lo dejas vacío, el título es el nombre."
-        />
-
-        <div>
-          <label htmlFor="leaderBio" className="label">Descripción</label>
-          <textarea
-            id="leaderBio"
-            rows={5}
-            value={settings.leaderBio ?? ''}
-            onChange={(e) => actualizar('leaderBio', e.target.value)}
-            className="input resize-y"
-          />
-          <p className="hint">Deja una línea en blanco para separar párrafos.</p>
-        </div>
-
-        <div>
-          <p className="label">Foto</p>
-          <FotoConAlt
-            id="leaderPhotoAlt"
-            media={settings.leaderPhoto}
-            alt={settings.leaderPhotoAlt ?? ''}
-            onMedia={(m) => actualizar('leaderPhoto', m)}
-            onAlt={(alt) => actualizar('leaderPhotoAlt', alt)}
-            placeholder="Retrato de ... , gerente general del ICGC"
-          />
-        </div>
-
-        <Trayectoria pasos={settings.leaderCareer} onChange={(pasos) => actualizar('leaderCareer', pasos)} />
-      </section>
-
-      {/* ── Google ── */}
-      <section className="card space-y-5 p-5">
-        <h2 className="text-sm font-bold text-brand-900">Google</h2>
-
-        <Campo
-          id="googleSiteVerification"
-          etiqueta="Código de verificación de Search Console"
-          valor={settings.googleSiteVerification ?? ''}
-          onChange={(v) => actualizar('googleSiteVerification', v || null)}
-          ayuda="El valor del meta google-site-verification. Se inserta solo en el <head> de la web."
-        />
-
-        <Campo
-          id="googleAnalyticsId"
-          etiqueta="ID de Google Analytics"
-          valor={settings.googleAnalyticsId ?? ''}
-          onChange={(v) => actualizar('googleAnalyticsId', v || null)}
-          ayuda="Formato G-XXXXXXXXXX."
-        />
-      </section>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={guardando} className="btn-primary">
-          {guardando ? 'Guardando...' : 'Guardar ajustes'}
-        </button>
-        <CambiarContrasena />
+        {/* ── 6. Google ── */}
+        <Seccion
+          id="google"
+          numero={6}
+          titulo="Google"
+          descripcion="Son datos técnicos. Si no los conoces, déjalos como están: la web funciona igual."
+        >
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div>
+              <label htmlFor="defaultMetaDescription" className="label">
+                Texto de la web en Google
+              </label>
+              <textarea
+                id="defaultMetaDescription"
+                rows={3}
+                value={settings.defaultMetaDescription}
+                onChange={(e) => actualizar('defaultMetaDescription', e.target.value)}
+                className="input resize-y"
+              />
+              <p className="hint">
+                {settings.defaultMetaDescription.length} letras (lo ideal: 120 a 160). Es lo que
+                Google muestra bajo el nombre de la web cuando una página no tiene texto propio.
+              </p>
+            </div>
+            <Campo
+              id="siteUrl"
+              etiqueta="Dirección de la web"
+              valor={settings.siteUrl}
+              onChange={(v) => actualizar('siteUrl', v)}
+              ayuda="El dominio final, con https://. Google lo usa para saber cuál es la dirección oficial."
+            />
+            <Campo
+              id="googleSiteVerification"
+              etiqueta="Código de Search Console (opcional)"
+              valor={settings.googleSiteVerification ?? ''}
+              onChange={(v) => actualizar('googleSiteVerification', v || null)}
+              ayuda="Search Console es la herramienta gratis de Google para ver con qué búsquedas te encuentran. Al registrar la web, Google te da un código: pégalo aquí."
+            />
+            <Campo
+              id="googleAnalyticsId"
+              etiqueta="Código de Google Analytics (opcional)"
+              valor={settings.googleAnalyticsId ?? ''}
+              onChange={(v) => actualizar('googleAnalyticsId', v || null)}
+              ayuda="Analytics cuenta cuántas personas visitan la web y qué páginas ven. Tiene la forma G-XXXXXXXXXX."
+            />
+          </div>
+        </Seccion>
       </div>
+
+      {/* ── Columna fija: índice, guardar y contraseña ── */}
+      <aside className="min-w-0">
+        <div className="space-y-4 xl:sticky xl:top-20">
+          <div className="card p-5">
+            <p className="text-base font-extrabold text-slate-900">Ajustes del sitio</p>
+            <ol className="mt-3 space-y-1 text-sm">
+              {SECCIONES.map((s, i) => (
+                <li key={s.id}>
+                  <a
+                    href={`#${s.id}`}
+                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 font-semibold text-slate-900 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs font-extrabold text-white">
+                      {i + 1}
+                    </span>
+                    {s.titulo}
+                  </a>
+                </li>
+              ))}
+            </ol>
+            <button type="submit" disabled={guardando} className="btn-primary mt-5 w-full">
+              {guardando ? 'Guardando...' : 'Guardar ajustes'}
+            </button>
+            <p className="hint text-center">La web se actualiza en 1 minuto.</p>
+          </div>
+          <CambiarContrasena />
+        </div>
+      </aside>
+
+      <ConfirmModal
+        abierto={confirmando}
+        titulo="¿Guardar los ajustes?"
+        mensaje="Los cambios se verán en toda la web pública: portada, contacto, pie de página y Nosotros."
+        textoConfirmar="Sí, guardar"
+        tono="publicar"
+        ocupado={guardando}
+        onConfirmar={() => void guardar()}
+        onCancelar={() => setConfirmando(false)}
+      />
     </form>
+  );
+}
+
+/** Bloque numerado de ajustes, con ancla para el índice lateral. */
+function Seccion({
+  id,
+  numero,
+  titulo,
+  descripcion,
+  children,
+}: {
+  id: string;
+  numero: number;
+  titulo: string;
+  descripcion: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-20">
+      <Paso numero={numero} titulo={titulo} descripcion={descripcion}>
+        {children}
+      </Paso>
+    </section>
   );
 }
 
@@ -577,7 +702,7 @@ function CambiarContrasena() {
 
   if (!abierto) {
     return (
-      <button type="button" onClick={() => setAbierto(true)} className="btn-secondary">
+      <button type="button" onClick={() => setAbierto(true)} className="btn-secondary w-full">
         Cambiar mi contraseña
       </button>
     );
@@ -587,7 +712,7 @@ function CambiarContrasena() {
     <div className="card w-full space-y-4 p-5">
       <h3 className="text-sm font-bold text-brand-900">Cambiar contraseña</h3>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4">
         <div>
           <label htmlFor="actual" className="label">
             Contraseña actual
