@@ -477,10 +477,10 @@ export function SettingsPage() {
             />
             <Campo
               id="googleAnalyticsId"
-              etiqueta="Código de Google Analytics (opcional)"
+              etiqueta="Código de Google Tag Manager o Analytics (opcional)"
               valor={settings.googleAnalyticsId ?? ''}
               onChange={(v) => actualizar('googleAnalyticsId', v || null)}
-              ayuda="Analytics cuenta cuántas personas visitan la web y qué páginas ven. Tiene la forma G-XXXXXXXXXX."
+              ayuda="Cuenta cuántas personas visitan la web y qué páginas ven. Pega solo el código: GTM-XXXXXXX (Tag Manager) o G-XXXXXXXXXX (Analytics). La web agrega la etiqueta de Google en todas las páginas."
             />
           </div>
         </Seccion>
