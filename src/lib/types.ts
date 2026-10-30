@@ -129,6 +129,8 @@ export interface SiteSettingsDTO {
   leaderPhoto: MediaDTO | null;
   leaderPhotoAlt: string | null;
   leaderCareer: CareerItem[];
+  /** Formación especializada: "Curso — Institución" */
+  leaderEducation: string[];
   updatedAt: string;
 }
 
@@ -325,10 +327,20 @@ export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   STOPPED: 'Paralizado',
 };
 
+/** Un trabajo realizado dentro de la experiencia (lista de la ficha del proyecto). */
+export interface ProjectItem {
+  title: string;
+  description: string;
+}
+
 export interface ProjectDTO {
   id: string;
   slug: string;
   title: string;
+  /** Empresa con la que se trabajó (minera u otra) */
+  company: string;
+  /** Trabajos realizados, en orden */
+  items: ProjectItem[];
   duration: string;
   status: ProjectStatus;
   capital: string;

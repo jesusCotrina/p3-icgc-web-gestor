@@ -4,6 +4,7 @@ import { authApi, projectsApi, settingsApi, uploadFile, type UploadProgress } fr
 import { formatBytes } from '@/lib/format';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { FotoConAlt } from '@/components/FotoConAlt';
+import { ListaEditable } from '@/components/ListaEditable';
 import { Paso } from '@/components/Paso';
 import type { CareerItem, SiteSettingsDTO } from '@/lib/types';
 
@@ -90,6 +91,7 @@ export function SettingsPage() {
         leaderPhotoMediaId: settings.leaderPhoto?.id ?? null,
         leaderPhotoAlt: settings.leaderPhotoAlt?.trim() || null,
         leaderCareer: settings.leaderCareer.filter((paso) => paso.period.trim() || paso.text.trim()),
+        leaderEducation: settings.leaderEducation.map((t) => t.trim()).filter(Boolean),
       });
 
       setSettings(actualizado);
@@ -434,6 +436,14 @@ export function SettingsPage() {
           <Trayectoria
             pasos={settings.leaderCareer}
             onChange={(pasos) => actualizar('leaderCareer', pasos)}
+          />
+          <ListaEditable
+            id="leaderEducation"
+            etiqueta="Formación especializada"
+            items={settings.leaderEducation.length ? settings.leaderEducation : ['']}
+            onChange={(items) => actualizar('leaderEducation', items)}
+            placeholder="Gestión y Manejo de Conflictos Sociales — ESAN"
+            ayuda="Un estudio por línea, con la institución después de una raya (—). En la web se muestran numerados."
           />
         </Seccion>
 

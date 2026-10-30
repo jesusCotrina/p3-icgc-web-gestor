@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { BotonEditar, BotonEliminar, BotonVer, BotonVisibilidad } from '@/components/BotonesAccion';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { projectsApi } from '@/lib/api';
-import { PERU_REGIONS, PROJECT_STATUS_LABELS, type ProjectDTO } from '@/lib/types';
+import { PERU_REGIONS, type ProjectDTO } from '@/lib/types';
 
 const SITE_URL = import.meta.env.VITE_SITE_URL ?? 'http://localhost:3000';
 
@@ -146,20 +146,19 @@ export function ProjectsPage() {
                     <span className={`badge ${p.isPublished ? 'bg-green-50 text-green-700' : 'bg-silver-100 text-slate-600'}`}>
                       {p.isPublished ? 'Publicado' : 'Oculto'}
                     </span>
-                    <span className="badge bg-amber-50 text-amber-800">{PROJECT_STATUS_LABELS[p.status]}</span>
+                    {p.company && <span className="badge bg-amber-50 text-amber-800">{p.company}</span>}
                     <span className="badge bg-brand-50 text-brand-700">{nombreRegion(p.region)}</span>
                   </div>
                   <h3 className="mt-1.5 truncate text-base font-bold text-brand-900">{p.title}</h3>
                   <p className="mt-0.5 text-xs text-slate-700">
-                    {p.communitiesBenefited} comunidad(es) · {p.achievements.length} logro(s) · orden {p.position}
-                    {p.latitude == null && ' · sin coordenadas (marcador en el centro de la región)'}
+                    {p.community} · {p.location} · {p.items.length} trabajo(s) · orden {p.position}
                   </p>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
                   <BotonEditar to={`/proyectos/${p.id}`} etiqueta={`Editar "${p.title}"`} />
                   {p.isPublished && (
-                    <BotonVer href={`${SITE_URL}/proyectos#${p.slug}`} etiqueta={`Ver "${p.title}" en la web`} />
+                    <BotonVer href={`${SITE_URL}/proyectos/${p.slug}`} etiqueta={`Ver "${p.title}" en la web`} />
                   )}
                   <BotonVisibilidad
                     publicado={p.isPublished}

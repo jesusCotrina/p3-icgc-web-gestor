@@ -102,8 +102,9 @@ export function CourseEditorPage() {
       setError('Agrega al menos un tema en "Contenido del programa".');
       return;
     }
-    if (!(Number(form.price.trim().replace(',', '.')) > 0)) {
-      setError('Indica el precio del curso.');
+    // El precio es opcional: vacío = la web muestra "Consultar"
+    if (form.price.trim() && !(Number(form.price.trim().replace(',', '.')) > 0)) {
+      setError('El precio debe ser un número mayor que cero, o déjalo vacío.');
       return;
     }
     if (form.isPublished && !form.coverImage) {
@@ -280,7 +281,7 @@ export function CourseEditorPage() {
           <div className="grid gap-5 sm:grid-cols-3">
             <div>
               <label htmlFor="price" className="label">
-                Precio {obligatorio}
+                Precio <span className="font-medium text-slate-700">(opcional)</span>
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-bold text-slate-700">
@@ -288,7 +289,6 @@ export function CourseEditorPage() {
                 </span>
                 <input
                   id="price"
-                  required
                   inputMode="decimal"
                   value={form.price}
                   onChange={(e) => actualizar('price', e.target.value.replace(/[^\d.,]/g, ''))}
@@ -296,7 +296,7 @@ export function CourseEditorPage() {
                   placeholder="150.00"
                 />
               </div>
-              <p className="hint">En soles. Se ve en la tarjeta y en la página del curso.</p>
+              <p className="hint">En soles. Si lo dejas vacío, la web muestra “Consultar”.</p>
             </div>
             <div>
               <label htmlFor="lectiveHours" className="label">
