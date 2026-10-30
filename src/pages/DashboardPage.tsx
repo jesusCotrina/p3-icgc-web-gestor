@@ -11,7 +11,7 @@ import {
   IconoServidor,
 } from '@/components/Iconos';
 import { API_URL, dashboardApi } from '@/lib/api';
-import { formatBytes, formatDateTime, formatNumber, formatUptime } from '@/lib/format';
+import { formatBytes, formatNumber, formatUptime } from '@/lib/format';
 import type { DashboardStatsDTO, ServerStatsDTO } from '@/lib/types';
 
 /** Dominio donde vive el sistema (el de la API), sin "https://". */
@@ -90,7 +90,7 @@ export function DashboardPage() {
     );
   }
 
-  const { content, recentPosts } = data;
+  const { content } = data;
   const stats = server ?? data.server;
   const sistema = stats.os.isWindows ? 'Windows' : stats.os.isLinux ? 'Linux' : stats.os.platform;
   const hayDisco = stats.disk.totalBytes > 0;
@@ -210,60 +210,6 @@ export function DashboardPage() {
         <p className="mt-2 text-xs font-medium text-slate-700">Se actualiza cada 10 segundos.</p>
       </section>
 
-      {/* ── Últimos artículos ── */}
-      <section aria-labelledby="ultimos">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="ultimos" className="text-lg font-extrabold text-slate-900">
-            Últimos artículos editados
-          </h2>
-          <Link to="/blogs" className="text-sm font-bold text-brand-700 hover:text-brand-900">
-            Ver todos
-          </Link>
-        </div>
-
-        <div className="card mt-4 divide-y divide-silver-200">
-          {recentPosts.length > 0 ? (
-            recentPosts.map((post) => (
-              <Link
-                key={post.id}
-                to={`/blogs/${post.id}`}
-                className="flex items-center gap-4 p-4 transition-colors hover:bg-brand-50/60"
-              >
-                <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-silver-100">
-                  {post.coverImage ? (
-                    <img
-                      src={post.coverImage.thumbUrl ?? post.coverImage.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-[0.6rem] font-bold text-slate-600">
-                      SIN PORTADA
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-slate-900">{post.title}</p>
-                  <p className="mt-0.5 text-xs font-medium text-slate-700">
-                    Editado el {formatDateTime(post.updatedAt)}
-                  </p>
-                </div>
-
-                <EstadoBadge status={post.status} />
-              </Link>
-            ))
-          ) : (
-            <div className="p-10 text-center">
-              <p className="font-medium text-slate-800">Todavía no hay artículos.</p>
-              <Link to="/blogs/nuevo" className="btn-primary mt-5">
-                Crear el primer blog
-              </Link>
-            </div>
-          )}
-        </div>
-      </section>
     </div>
   );
 }
