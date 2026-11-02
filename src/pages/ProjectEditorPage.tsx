@@ -30,6 +30,7 @@ const VACIO: Formulario = {
   community: '',
   implementingEntity: '',
   area: '',
+  headline: '',
   objective: '',
   items: [TRABAJO_VACIO],
   achievements: [],
@@ -325,7 +326,23 @@ export function ProjectEditorPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label htmlFor="headline" className="label">
+                    Subtítulo
+                  </label>
+                  <input
+                    id="headline"
+                    value={form.headline ?? ''}
+                    onChange={(e) => actualizar('headline', e.target.value)}
+                    maxLength={200}
+                    className="input"
+                    placeholder="Asesoría integral a la Comunidad Campesina de Quichas"
+                  />
+                  <p className="hint">
+                    Va debajo del título en la página del proyecto. Si lo dejas vacío, se muestra el nombre de la comunidad.
+                  </p>
+                </div>
                 <label htmlFor="objective" className="label">
                   Descripción {obligatorio}
                 </label>
