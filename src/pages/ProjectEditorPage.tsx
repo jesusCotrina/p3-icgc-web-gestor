@@ -31,6 +31,7 @@ const VACIO: Formulario = {
   implementingEntity: '',
   area: '',
   headline: '',
+  itemsTitle: '',
   objective: '',
   items: [TRABAJO_VACIO],
   achievements: [],
@@ -360,6 +361,22 @@ export function ProjectEditorPage() {
 
           {/* ── Paso 3: trabajos realizados ── */}
           <Paso numero={3} titulo="Trabajos realizados">
+            <div>
+              <label htmlFor="itemsTitle" className="label">
+                Título de esta lista
+              </label>
+              <input
+                id="itemsTitle"
+                value={form.itemsTitle ?? ''}
+                onChange={(e) => actualizar('itemsTitle', e.target.value)}
+                maxLength={120}
+                className="input"
+                placeholder="Servicios brindados"
+              />
+              <p className="hint">
+                Encabezado de la lista en la página del proyecto. Vacío = "Servicios brindados".
+              </p>
+            </div>
             <p className="hint -mt-1">
               Cada trabajo se muestra en la página del proyecto con su ícono, su título y su
               descripción. Usa las flechas para cambiar el orden.

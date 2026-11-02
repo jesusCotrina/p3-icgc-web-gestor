@@ -350,6 +350,8 @@ export interface ProjectDTO {
   area: string;
   /** Subtítulo del detalle; vacío = se muestra la comunidad */
   headline: string;
+  /** Título de la lista de trabajos; vacío = "Servicios brindados" */
+  itemsTitle: string;
   objective: string;
   achievements: string[];
   communitiesBenefited: number;
