@@ -358,30 +358,33 @@ export function CourseEditorPage() {
 
           <div>
             <label htmlFor="audience" className="label">
-              Dirigido a {obligatorio}
+              ¿A quién va dirigido? {obligatorio}
             </label>
-            <input
+            <textarea
               id="audience"
               required
+              rows={5}
               value={form.audience}
               onChange={(e) => actualizar('audience', e.target.value)}
-              className="input"
-              placeholder="Dirigentes en ejercicio y comuneros empadronados"
+              className="input resize-y"
+              placeholder={'Presidentes y directivos comunales\nGerentes de empresas comunales\nComuneros y comuneras empadronados'}
             />
+            <p className="hint">Un público por línea: en la web cada línea es una tarjeta de la lista.</p>
           </div>
 
           <div>
             <label htmlFor="objective" className="label">
-              ¿Para qué le sirve al alumno? {opcional}
+              ¿Qué aprenderá? {opcional}
             </label>
             <textarea
               id="objective"
-              rows={2}
+              rows={5}
               value={form.objective ?? ''}
               onChange={(e) => actualizar('objective', e.target.value)}
               className="input resize-y"
-              placeholder="Al terminar podrá llevar el libro de actas y el padrón comunal sin observaciones."
+              placeholder={'Convocar y conducir asambleas válidas\nRendir cuentas con transparencia'}
             />
+            <p className="hint">Un aprendizaje por línea: en la web se muestran como lista con vistos.</p>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-3">
