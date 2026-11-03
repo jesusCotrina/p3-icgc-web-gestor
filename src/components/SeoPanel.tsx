@@ -103,7 +103,7 @@ export function SaludSeo({
     puntaje >= 80
       ? { texto: '¡Muy bien!', color: 'text-green-700', barra: 'bg-green-500' }
       : puntaje >= 50
-        ? { texto: 'Va bien, se puede mejorar', color: 'text-amber-700', barra: 'bg-amber-500' }
+        ? { texto: 'Va bien, se puede mejorar', color: 'text-dorado-oscuro', barra: 'bg-arena0' }
         : { texto: 'Le falta trabajo', color: 'text-red-700', barra: 'bg-red-500' };
 
   return (
@@ -153,7 +153,7 @@ export function SaludSeo({
             )}
             {consejos.length > 0 && (
               <>
-                <p className="mt-4 text-sm font-bold text-amber-800">
+                <p className="mt-4 text-sm font-bold text-dorado-oscuro">
                   Consejos para que más gente lo encuentre:
                 </p>
                 <ul className="mt-2 space-y-2">
@@ -277,7 +277,7 @@ export function Contador({ actual, min, max }: { actual: number; min?: number; m
       : largo
         ? 'text-red-700'
         : corto
-          ? 'text-amber-700'
+          ? 'text-dorado-oscuro'
           : 'text-green-700';
   return (
     <span className={`text-xs font-bold ${color}`}>
@@ -291,7 +291,7 @@ function Aviso({ issue }: { issue: SeoIssue }) {
   return (
     <li
       className={`flex gap-2 rounded-lg px-3 py-2 text-sm leading-relaxed ${
-        esError ? 'bg-red-50 text-red-900' : 'bg-amber-50 text-amber-900'
+        esError ? 'bg-red-50 text-red-900' : 'bg-arena text-dorado-oscuro'
       }`}
     >
       <span aria-hidden="true" className="font-extrabold">

@@ -170,7 +170,7 @@ export function MediaPage() {
                   </span>
 
                   {media.kind === 'IMAGE' && !media.alt && (
-                    <span className="badge hidden bg-amber-100 text-amber-900 sm:inline-flex">
+                    <span className="badge hidden bg-arena text-dorado-oscuro sm:inline-flex">
                       Sin descripción
                     </span>
                   )}

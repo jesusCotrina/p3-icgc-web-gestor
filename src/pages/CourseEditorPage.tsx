@@ -174,12 +174,12 @@ export function CourseEditorPage() {
             />
             Publicado en la web
           </label>
-          <label className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+          <label className="flex items-center gap-2 rounded-lg border border-dorado/40 bg-arena px-3 py-2 text-sm font-bold text-dorado-oscuro">
             <input
               type="checkbox"
               checked={form.comingSoon}
               onChange={(e) => actualizar('comingSoon', e.target.checked)}
-              className="h-4 w-4 accent-amber-500"
+              className="h-4 w-4 accent-dorado"
             />
             Próximamente
           </label>

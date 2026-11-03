@@ -146,7 +146,7 @@ export function ProjectsPage() {
                     <span className={`badge ${p.isPublished ? 'bg-green-50 text-green-700' : 'bg-silver-100 text-slate-600'}`}>
                       {p.isPublished ? 'Publicado' : 'Oculto'}
                     </span>
-                    {p.company && <span className="badge bg-amber-50 text-amber-800">{p.company}</span>}
+                    {p.company && <span className="badge bg-arena text-dorado-oscuro">{p.company}</span>}
                     <span className="badge bg-brand-50 text-brand-700">{nombreRegion(p.region)}</span>
                   </div>
                   <h3 className="mt-1.5 truncate text-base font-bold text-brand-900">{p.title}</h3>

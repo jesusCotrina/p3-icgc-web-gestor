@@ -233,7 +233,7 @@ export function SettingsPage() {
                 <img
                   src={settings.logo?.url ?? '/logo-icgc.png'}
                   alt={settings.logoAlt}
-                  className="h-20 w-20 shrink-0 rounded-full border border-silver-200 bg-white object-contain p-1"
+                  className="h-20 w-20 shrink-0 object-contain"
                 />
                 <div className="min-w-0 flex-1">
                   {progreso ? (
@@ -311,7 +311,7 @@ export function SettingsPage() {
           descripcion="Se muestran en Nosotros y en el pie de la web."
         >
           {!settings.whatsapp?.trim() && (
-            <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+            <p className="rounded-lg bg-arena px-4 py-3 text-sm leading-relaxed text-dorado-oscuro">
               <strong>Falta el número de WhatsApp.</strong> Sin él, los botones de la web llevan
               al formulario de contacto en vez de abrir WhatsApp.
             </p>

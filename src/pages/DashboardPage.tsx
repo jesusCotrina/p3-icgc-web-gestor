@@ -219,8 +219,8 @@ export function DashboardPage() {
 const TONOS = {
   brand: { caja: 'bg-brand-100 text-brand-700', detalle: 'bg-brand-50 text-brand-800' },
   green: { caja: 'bg-green-100 text-green-700', detalle: 'bg-green-50 text-green-800' },
-  violet: { caja: 'bg-violet-100 text-violet-700', detalle: 'bg-violet-50 text-violet-800' },
-  amber: { caja: 'bg-amber-100 text-amber-700', detalle: 'bg-amber-50 text-amber-800' },
+  violet: { caja: 'bg-arena text-dorado-oscuro', detalle: 'bg-arena text-dorado-oscuro' },
+  amber: { caja: 'bg-arena text-dorado-oscuro', detalle: 'bg-arena text-dorado-oscuro' },
 } as const;
 
 type Tono = keyof typeof TONOS;
@@ -281,7 +281,7 @@ function Bloque({
       : porcentaje >= 90
         ? 'bg-red-500'
         : porcentaje >= 75
-          ? 'bg-amber-500'
+          ? 'bg-arena0'
           : 'bg-brand-600';
 
   return (
@@ -335,7 +335,7 @@ function Fila({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 export function EstadoBadge({ status }: { status: string }) {
   const mapa: Record<string, { texto: string; clase: string }> = {
     PUBLISHED: { texto: 'Publicado', clase: 'bg-green-100 text-green-800' },
-    DRAFT: { texto: 'Borrador', clase: 'bg-amber-100 text-amber-800' },
+    DRAFT: { texto: 'Borrador', clase: 'bg-arena text-dorado-oscuro' },
     ARCHIVED: { texto: 'Archivado', clase: 'bg-silver-200 text-slate-800' },
   };
   const item = mapa[status] ?? mapa.DRAFT!;
