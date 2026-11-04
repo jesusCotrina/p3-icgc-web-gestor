@@ -57,8 +57,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     signal,
   });
 
-  // Sesión vencida: limpiamos y mandamos al login
-  if (res.status === 401) {
+  // Sesión vencida: limpiamos y mandamos al login. En el propio login un 401
+  // es "correo o contraseña incorrectos" y se muestra el mensaje del servidor.
+  if (res.status === 401 && path !== '/auth/login') {
     tokenStore.clear();
     if (!window.location.pathname.startsWith('/login')) {
       window.location.href = '/login';
