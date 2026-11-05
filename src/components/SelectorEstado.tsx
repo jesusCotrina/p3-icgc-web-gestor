@@ -7,8 +7,9 @@ const OPCIONES: { valor: FiltroEstado; etiqueta: string }[] = [
 ];
 
 /**
- * Selector de los listados de cursos y proyectos: qué se ve en la web
- * (publicados), qué está guardado pero oculto (archivados) o todo.
+ * Filtro de los listados de cursos y proyectos, con los mismos botones que el
+ * de Blogs: qué se ve en la web (publicados), qué está guardado pero oculto
+ * (archivados) o todo.
  */
 export function SelectorEstado({
   valor,
@@ -18,20 +19,20 @@ export function SelectorEstado({
   onChange: (valor: FiltroEstado) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-      <span className="sr-only sm:not-sr-only">Mostrar</span>
-      <select
-        value={valor}
-        onChange={(e) => onChange(e.target.value as FiltroEstado)}
-        aria-label="Mostrar"
-        className="input w-auto py-2 pr-9 font-semibold"
-      >
-        {OPCIONES.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.etiqueta}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div role="group" aria-label="Mostrar" className="flex flex-wrap gap-1.5">
+      {OPCIONES.map((o) => (
+        <button
+          key={o.valor}
+          type="button"
+          onClick={() => onChange(o.valor)}
+          aria-pressed={valor === o.valor}
+          className={`rounded-lg px-3.5 py-2 text-sm font-bold transition-colors ${
+            valor === o.valor ? 'bg-brand-600 text-white' : 'text-slate-800 hover:bg-brand-50'
+          }`}
+        >
+          {o.etiqueta}
+        </button>
+      ))}
+    </div>
   );
 }
