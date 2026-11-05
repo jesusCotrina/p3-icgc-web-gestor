@@ -5,7 +5,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { FotoConAlt } from '@/components/FotoConAlt';
 import { ListaEditable } from '@/components/ListaEditable';
 import { Paso } from '@/components/Paso';
-import type { CareerItem, SiteSettingsDTO } from '@/lib/types';
+import type { CareerItem, MediaDTO, SiteSettingsDTO } from '@/lib/types';
 
 /**
  * Ajustes del sitio: logo, datos de la organización y metadatos globales.
@@ -22,10 +22,17 @@ export function SettingsPage() {
   const [progreso, setProgreso] = useState<UploadProgress | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const inputLogo = useRef<HTMLInputElement>(null);
+  // Las tres fotos del hero de la portada, en orden (una ranura puede estar vacía)
+  const [hero, setHero] = useState<RanuraHero[]>(desdeSlides([]));
+  const cambiarHero = (i: number, cambio: Partial<RanuraHero>) =>
+    setHero((prev) => prev.map((h, j) => (j === i ? { ...h, ...cambio } : h)));
   useEffect(() => {
     settingsApi
       .get()
-      .then(setSettings)
+      .then((s) => {
+        setSettings(s);
+        setHero(desdeSlides(s.heroSlides));
+      })
       .catch((err) =>
         setAviso({
           tipo: 'error',
@@ -41,6 +48,15 @@ export function SettingsPage() {
 
   async function guardar() {
     if (!settings) return;
+
+    // SEO: toda foto de la portada necesita su descripción antes de guardarse
+    const sinAlt = hero.findIndex((h) => h.media && h.alt.trim().length < 3);
+    if (sinAlt >= 0) {
+      setConfirmando(false);
+      setAviso({ tipo: 'error', texto: `Describe la foto ${sinAlt + 1} de la portada antes de guardar.` });
+      document.getElementById('portada')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
 
     setGuardando(true);
     setAviso(null);
@@ -76,11 +92,13 @@ export function SettingsPage() {
         leaderBio: settings.leaderBio?.trim() || null,
         leaderPhotoMediaId: settings.leaderPhoto?.id ?? null,
         leaderPhotoAlt: settings.leaderPhotoAlt?.trim() || null,
+        heroSlides: hero.filter((h) => h.media).map((h) => ({ mediaId: h.media!.id, alt: h.alt.trim() })),
         leaderCareer: settings.leaderCareer.filter((paso) => paso.period.trim() || paso.text.trim()),
         leaderEducation: settings.leaderEducation.map((t) => t.trim()).filter(Boolean),
       });
 
       setSettings(actualizado);
+      setHero(desdeSlides(actualizado.heroSlides));
       setConfirmando(false);
       setAviso({ tipo: 'ok', texto: 'Ajustes guardados. La web pública los tomará en 1 minuto.' });
     } catch (err) {
@@ -150,6 +168,7 @@ export function SettingsPage() {
   }
 
   const SECCIONES = [
+    { id: 'portada', titulo: 'Fotos de la portada' },
     { id: 'cifras', titulo: 'Cifras del inicio' },
     { id: 'identidad', titulo: 'Logo y nombre' },
     { id: 'contacto', titulo: 'Contacto y WhatsApp' },
@@ -178,10 +197,38 @@ export function SettingsPage() {
           </p>
         )}
 
-        {/* ── 1. Lo primero que se ve en la web ── */}
+        {/* ── 1. Las fotos del hero de la portada ── */}
+        <Seccion
+          id="portada"
+          numero={1}
+          titulo="Fotos de la portada"
+          descripcion="Las tres fotos que rotan en el hero del inicio, en este orden. Si las dejas vacías, la web usa sus fotos de fábrica."
+        >
+          <div className="grid gap-5 lg:grid-cols-3">
+            {hero.map((h, i) => (
+              <div key={i} className="rounded-xl border border-silver-200 bg-silver-100/60 p-4">
+                <p className="label">Foto {i + 1}</p>
+                <FotoConAlt
+                  id={`hero${i + 1}Alt`}
+                  media={h.media}
+                  alt={h.alt}
+                  onMedia={(m) => cambiarHero(i, { media: m })}
+                  onAlt={(alt) => cambiarHero(i, { alt })}
+                  placeholder="Comuneros reunidos en asamblea con los Andes al fondo"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="hint">
+            Usa fotos horizontales de al menos 1600 px de ancho. Se guardan con el botón “Guardar
+            ajustes” de la derecha.
+          </p>
+        </Seccion>
+
+        {/* ── 2. Las cifras de "Quiénes somos" ── */}
         <Seccion
           id="cifras"
-          numero={1}
+          numero={2}
           titulo="Cifras de la página de inicio"
           descripcion="Los cuatro números que se animan en “Quiénes somos”, en este orden."
         >
@@ -223,7 +270,7 @@ export function SettingsPage() {
         {/* ── 2. Identidad ── */}
         <Seccion
           id="identidad"
-          numero={2}
+          numero={3}
           titulo="Logo y nombre del instituto"
           descripcion="Se ven en la cabecera, el pie, la pestaña del navegador y al compartir la web."
         >
@@ -307,7 +354,7 @@ export function SettingsPage() {
         {/* ── 3. Contacto ── */}
         <Seccion
           id="contacto"
-          numero={3}
+          numero={4}
           titulo="Contacto y WhatsApp"
           descripcion="Se muestran en Nosotros y en el pie de la web."
         >
@@ -364,7 +411,7 @@ export function SettingsPage() {
         {/* ── 4. Redes ── */}
         <Seccion
           id="redes"
-          numero={4}
+          numero={5}
           titulo="Redes sociales"
           descripcion="Pega el enlace de cada perfil. Las que dejes vacías no se muestran."
         >
@@ -380,7 +427,7 @@ export function SettingsPage() {
         {/* ── 5. Líder ── */}
         <Seccion
           id="lider"
-          numero={5}
+          numero={6}
           titulo="Líder o gerente general"
           descripcion="Arma la franja “Sobre el líder” en la página Nosotros. Si dejas el nombre vacío, no se muestra."
         >
@@ -451,7 +498,7 @@ export function SettingsPage() {
         {/* ── 6. Google ── */}
         <Seccion
           id="google"
-          numero={6}
+          numero={7}
           titulo="Google"
           descripcion="Son datos técnicos. Si no los conoces, déjalos como están: la web funciona igual."
         >
@@ -756,4 +803,13 @@ function CambiarContrasena() {
       </div>
     </div>
   );
+}
+
+/** Una de las tres ranuras de fotos del hero de la portada. */
+type RanuraHero = { media: MediaDTO | null; alt: string };
+
+/** Siempre tres ranuras, en el orden de `position`; las que faltan quedan vacías. */
+function desdeSlides(slides: SiteSettingsDTO['heroSlides']): RanuraHero[] {
+  const ordenadas = [...slides].sort((a, b) => a.position - b.position);
+  return [0, 1, 2].map((i) => ({ media: ordenadas[i]?.media ?? null, alt: ordenadas[i]?.alt ?? '' }));
 }

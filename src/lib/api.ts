@@ -247,7 +247,13 @@ export function uploadFile(
 export const settingsApi = {
   get: () => request<SiteSettingsDTO>('/admin/settings'),
   // La foto del líder viaja como id: el archivo ya se subió a Multimedia
-  update: (data: Partial<SiteSettingsDTO> & { leaderPhotoMediaId?: string | null }) =>
+  update: (
+    data: Partial<Omit<SiteSettingsDTO, 'heroSlides'>> & {
+      leaderPhotoMediaId?: string | null;
+      /** Fotos del hero en orden: id del archivo subido y su texto alternativo */
+      heroSlides?: { mediaId: string; alt: string }[];
+    },
+  ) =>
     request<SiteSettingsDTO>('/admin/settings', { method: 'PUT', body: data }),
 };
 

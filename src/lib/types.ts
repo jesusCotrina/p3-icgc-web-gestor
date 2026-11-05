@@ -96,7 +96,17 @@ export interface CategoryDTO extends TaxonomyRef {
   postCount: number;
 }
 
+/** Una foto del hero del inicio, con su texto alternativo */
+export interface HeroSlideDTO {
+  id: string;
+  position: number;
+  media: MediaDTO;
+  alt: string;
+}
+
 export interface SiteSettingsDTO {
+  /** Fotos del hero del inicio, en orden (hasta 3); vacío = fotos de fábrica de la web */
+  heroSlides: HeroSlideDTO[];
   siteName: string;
   tagline: string;
   defaultMetaDescription: string;
