@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BotonEditar, BotonEliminar, BotonVer, BotonVisibilidad } from '@/components/BotonesAccion';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { SelectorEstado, type FiltroEstado } from '@/components/SelectorEstado';
 import { coursesApi } from '@/lib/api';
 import type { CourseDTO } from '@/lib/types';
 
@@ -18,6 +19,7 @@ export function CoursesPage() {
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [accion, setAccion] = useState<Accion | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
 
   const cargar = useCallback(async () => {
     try {
@@ -59,18 +61,29 @@ export function CoursesPage() {
     }
   }
 
+  // Lo que se lista: todos, solo los que se ven en la web o solo los archivados
+  const publicados = cursos?.filter((c) => c.isPublished).length ?? 0;
+  const lista = (cursos ?? []).filter((c) =>
+    filtro === 'todos' ? true : filtro === 'publicados' ? c.isPublished : !c.isPublished,
+  );
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-brand-900">Cursos de capacitación</h2>
           <p className="mt-0.5 text-sm text-slate-700">
-            {cursos ? `${cursos.length} curso(s) · se muestran en /cursos y en el inicio` : 'Cargando...'}
+            {cursos
+              ? `${cursos.length} curso(s) · ${publicados} en /cursos y en el inicio`
+              : 'Cargando...'}
           </p>
         </div>
-        <Link to="/cursos/nuevo" className="btn-primary">
-          + Nuevo curso
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SelectorEstado valor={filtro} onChange={setFiltro} />
+          <Link to="/cursos/nuevo" className="btn-primary">
+            + Nuevo curso
+          </Link>
+        </div>
       </div>
 
       {aviso && (
@@ -100,9 +113,13 @@ export function CoursesPage() {
             + Nuevo curso
           </Link>
         </div>
+      ) : lista.length === 0 ? (
+        <div className="card p-10 text-center text-sm text-slate-600">
+          No hay cursos {filtro} todav�a.
+        </div>
       ) : (
         <ul className="space-y-3">
-          {cursos.map((curso) => (
+          {lista.map((curso) => (
             <li key={curso.id} className="card p-4">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-silver-100">

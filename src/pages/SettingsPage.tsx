@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { authApi, projectsApi, settingsApi, uploadFile, type UploadProgress } from '@/lib/api';
+import { authApi, settingsApi, uploadFile, type UploadProgress } from '@/lib/api';
 import { formatBytes } from '@/lib/format';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { FotoConAlt } from '@/components/FotoConAlt';
@@ -23,22 +22,6 @@ export function SettingsPage() {
   const [progreso, setProgreso] = useState<UploadProgress | null>(null);
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const inputLogo = useRef<HTMLInputElement>(null);
-  const [cifras, setCifras] = useState<{ proyectos: number; regiones: number } | null>(null);
-
-  // Mismo cálculo que hace la web: solo cuentan los proyectos publicados
-  useEffect(() => {
-    projectsApi
-      .list()
-      .then((lista) => {
-        const publicados = lista.filter((p) => p.isPublished);
-        setCifras({
-          proyectos: publicados.length,
-          regiones: new Set(publicados.map((p) => p.region)).size,
-        });
-      })
-      .catch(() => setCifras(null));
-  }, []);
-
   useEffect(() => {
     settingsApi
       .get()
@@ -83,7 +66,10 @@ export function SettingsPage() {
         tiktokUrl: settings.tiktokUrl,
         googleAnalyticsId: settings.googleAnalyticsId,
         googleSiteVerification: settings.googleSiteVerification,
+        clientSatisfaction: settings.clientSatisfaction,
+        projectsAdvised: settings.projectsAdvised,
         yearsExperience: settings.yearsExperience,
+        regionsServed: settings.regionsServed,
         leaderName: settings.leaderName?.trim() || null,
         leaderRole: settings.leaderRole?.trim() || null,
         leaderHeadline: settings.leaderHeadline?.trim() || null,
@@ -197,9 +183,23 @@ export function SettingsPage() {
           id="cifras"
           numero={1}
           titulo="Cifras de la página de inicio"
-          descripcion="Los tres números que se animan en la portada."
+          descripcion="Los cuatro números que se animan en “Quiénes somos”, en este orden."
         >
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <CampoNumero
+              id="clientSatisfaction"
+              etiqueta="Satisfacción de clientes (%)"
+              valor={settings.clientSatisfaction}
+              onChange={(v) => actualizar('clientSatisfaction', Math.min(100, v))}
+              vistaPrevia={`+${settings.clientSatisfaction}%`}
+            />
+            <CampoNumero
+              id="projectsAdvised"
+              etiqueta="Proyectos implementados"
+              valor={settings.projectsAdvised}
+              onChange={(v) => actualizar('projectsAdvised', v)}
+              vistaPrevia={`+${settings.projectsAdvised}`}
+            />
             <CampoNumero
               id="yearsExperience"
               etiqueta="Años de experiencia"
@@ -207,16 +207,16 @@ export function SettingsPage() {
               onChange={(v) => actualizar('yearsExperience', v)}
               vistaPrevia={`+${settings.yearsExperience}`}
             />
-            {/* Calculadas desde Proyectos: así coinciden con el mapa de la web */}
-            <CifraCalculada etiqueta="Proyectos asesorados" valor={cifras?.proyectos} />
-            <CifraCalculada etiqueta="Regiones atendidas" valor={cifras?.regiones} />
+            <CampoNumero
+              id="regionsServed"
+              etiqueta="Regiones del Perú atendidas"
+              valor={settings.regionsServed}
+              onChange={(v) => actualizar('regionsServed', v)}
+              vistaPrevia={`${settings.regionsServed}`}
+            />
           </div>
           <p className="hint">
-            Los proyectos y las regiones se cuentan solos desde{' '}
-            <Link to="/proyectos" className="font-bold text-brand-700 hover:underline">
-              Proyectos
-            </Link>
-            .
+            Escribe solo el número: la web agrega el “+”, el “%” y el texto de cada cifra.
           </p>
         </Seccion>
 
@@ -275,6 +275,7 @@ export function SettingsPage() {
                   etiqueta="¿Qué se ve en el logo?"
                   valor={settings.logoAlt}
                   onChange={(v) => actualizar('logoAlt', v)}
+                  ayuda="Describe lo que se ve en la foto. Google lo usa para entender la imagen y los lectores de pantalla lo leen en voz alta."
                 />
               </div>
             </div>
@@ -641,16 +642,6 @@ function Trayectoria({ pasos, onChange }: { pasos: CareerItem[]; onChange: (paso
       <button type="button" onClick={() => onChange([...pasos, { period: '', text: '' }])} className="btn-secondary mt-3">
         + Agregar paso
       </button>
-    </div>
-  );
-}
-
-function CifraCalculada({ etiqueta, valor }: { etiqueta: string; valor: number | undefined }) {
-  return (
-    <div>
-      <p className="label">{etiqueta}</p>
-      <p className="input bg-silver-100 font-bold text-brand-700">{valor ?? '…'}</p>
-      <p className="hint">Automático, según los proyectos publicados.</p>
     </div>
   );
 }

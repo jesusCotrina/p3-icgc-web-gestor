@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BotonEditar, BotonEliminar, BotonVer, BotonVisibilidad } from '@/components/BotonesAccion';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { SelectorEstado, type FiltroEstado } from '@/components/SelectorEstado';
 import { projectsApi } from '@/lib/api';
 import { PERU_REGIONS, type ProjectDTO } from '@/lib/types';
 
@@ -20,6 +21,7 @@ export function ProjectsPage() {
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [accion, setAccion] = useState<Accion | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
 
   const cargar = useCallback(async () => {
     try {
@@ -61,10 +63,11 @@ export function ProjectsPage() {
     }
   }
 
-  // Las mismas cifras que verá la web (solo cuentan los publicados)
-  const publicados = proyectos?.filter((p) => p.isPublished) ?? [];
-  const regiones = new Set(publicados.map((p) => p.region)).size;
-  const comunidades = publicados.reduce((t, p) => t + p.communitiesBenefited, 0);
+  // Lo que se lista: todos, solo los que se ven en la web o solo los archivados
+  const publicados = proyectos?.filter((p) => p.isPublished).length ?? 0;
+  const lista = (proyectos ?? []).filter((p) =>
+    filtro === 'todos' ? true : filtro === 'publicados' ? p.isPublished : !p.isPublished,
+  );
 
   return (
     <div className="space-y-5">
@@ -72,32 +75,18 @@ export function ProjectsPage() {
         <div>
           <h2 className="text-lg font-bold text-brand-900">Proyectos</h2>
           <p className="mt-0.5 text-sm text-slate-700">
-            {proyectos ? `${proyectos.length} proyecto(s)` : 'Cargando...'}
+            {proyectos
+              ? `${proyectos.length} proyecto(s) · ${publicados} en la web`
+              : 'Cargando...'}
           </p>
         </div>
-        <Link to="/proyectos/nuevo" className="btn-primary">
-          + Nuevo proyecto
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <SelectorEstado valor={filtro} onChange={setFiltro} />
+          <Link to="/proyectos/nuevo" className="btn-primary">
+            + Nuevo proyecto
+          </Link>
+        </div>
       </div>
-
-      {proyectos && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            { valor: publicados.length, etiqueta: 'proyectos publicados' },
-            { valor: regiones, etiqueta: 'regiones' },
-            { valor: comunidades, etiqueta: 'comunidades beneficiadas' },
-          ].map((c) => (
-            <div key={c.etiqueta} className="card p-4">
-              <p className="text-2xl font-black text-brand-700">{c.valor}</p>
-              <p className="text-xs text-slate-700">{c.etiqueta}</p>
-            </div>
-          ))}
-          <p className="text-xs text-slate-700 sm:col-span-3">
-            Estas cifras se muestran en el hero de la página de inicio y en el mapa “Nuestra huella
-            en el Perú”. Se calculan solas a partir de los proyectos publicados.
-          </p>
-        </div>
-      )}
 
       {aviso && (
         <p
@@ -126,9 +115,13 @@ export function ProjectsPage() {
             + Nuevo proyecto
           </Link>
         </div>
+      ) : lista.length === 0 ? (
+        <div className="card p-10 text-center text-sm text-slate-600">
+          No hay proyectos {filtro} todav�a.
+        </div>
       ) : (
         <ul className="space-y-3">
-          {proyectos.map((p) => (
+          {lista.map((p) => (
             <li key={p.id} className="card p-4">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-silver-100">
