@@ -172,7 +172,16 @@ export const mediaApi = {
     const query = search.toString();
     return request<Paginated<MediaDTO>>(`/admin/media${query ? `?${query}` : ''}`);
   },
-  update: (id: string, data: { alt?: string | null; caption?: string | null }) =>
+  update: (
+    id: string,
+    data: {
+      alt?: string | null;
+      caption?: string | null;
+      author?: string | null;
+      source?: string | null;
+      sourceUrl?: string | null;
+    },
+  ) =>
     request<MediaDTO>(`/admin/media/${id}`, { method: 'PATCH', body: data }),
   remove: (id: string) => request<{ ok: boolean }>(`/admin/media/${id}`, { method: 'DELETE' }),
 };

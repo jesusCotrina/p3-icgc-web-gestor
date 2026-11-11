@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { CreditosFoto } from '@/components/CreditosFoto';
 import { uploadFile, type UploadProgress } from '@/lib/api';
 import { formatBytes } from '@/lib/format';
 import type { BlockType, DraftBlock, MediaDTO } from '@/lib/types';
@@ -284,6 +285,14 @@ function CuerpoBloque({
               className="input"
             />
           </div>
+          {block.media && (
+            <CreditosFoto
+              key={block.media.id}
+              media={block.media}
+              idBase={`creditos-${block.key}`}
+              onChange={(media) => onChange({ media })}
+            />
+          )}
         </div>
       );
 

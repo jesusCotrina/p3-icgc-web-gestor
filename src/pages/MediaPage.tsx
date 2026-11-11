@@ -4,6 +4,9 @@ import { mediaApi } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format';
 import type { MediaDTO, Paginated } from '@/lib/types';
 
+/** Textos editables de un archivo: alt, pie y créditos de la foto */
+type DatosMedia = { alt: string; caption: string; author: string; source: string; sourceUrl: string };
+
 /**
  * Biblioteca de archivos del servidor: todo lo que se subió desde el gestor.
  * Desde aquí se corrige el texto alternativo de las imágenes, que es un dato
@@ -61,9 +64,15 @@ export function MediaPage() {
     }
   }
 
-  async function guardarTextos(media: MediaDTO, alt: string, caption: string) {
+  async function guardarTextos(media: MediaDTO, datos: DatosMedia) {
     try {
-      await mediaApi.update(media.id, { alt: alt || null, caption: caption || null });
+      await mediaApi.update(media.id, {
+        alt: datos.alt || null,
+        caption: datos.caption || null,
+        author: datos.author || null,
+        source: datos.source || null,
+        sourceUrl: datos.sourceUrl || null,
+      });
       setAviso({ tipo: 'ok', texto: 'Datos del archivo actualizados' });
       setSeleccionado(null);
       await cargar();
@@ -251,11 +260,14 @@ function DetalleArchivo({
 }: {
   media: MediaDTO;
   onClose: () => void;
-  onSave: (media: MediaDTO, alt: string, caption: string) => Promise<void>;
+  onSave: (media: MediaDTO, datos: DatosMedia) => Promise<void>;
   onDelete: (media: MediaDTO) => Promise<void>;
 }) {
   const [alt, setAlt] = useState(media.alt ?? '');
   const [caption, setCaption] = useState(media.caption ?? '');
+  const [author, setAuthor] = useState(media.author ?? '');
+  const [source, setSource] = useState(media.source ?? '');
+  const [sourceUrl, setSourceUrl] = useState(media.sourceUrl ?? '');
 
   // Cerrar con Escape: estándar en cualquier modal
   useEffect(() => {
@@ -339,6 +351,59 @@ function DetalleArchivo({
             />
           </div>
 
+          {media.kind === 'IMAGE' && (
+            <div>
+              <p className="label">Créditos de la foto (opcional)</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="autor-media" className="sr-only">
+                    Autor de la foto
+                  </label>
+                  <input
+                    id="autor-media"
+                    type="text"
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    placeholder="Autor: Equipo ICGC"
+                    maxLength={150}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="fuente-media" className="sr-only">
+                    Fuente de la foto
+                  </label>
+                  <input
+                    id="fuente-media"
+                    type="text"
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    placeholder="Fuente: Wikimedia Commons"
+                    maxLength={150}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="enlace-media" className="sr-only">
+                    Enlace de la fuente
+                  </label>
+                  <input
+                    id="enlace-media"
+                    type="url"
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    placeholder="Enlace: https://..."
+                    maxLength={500}
+                    className="input"
+                  />
+                </div>
+              </div>
+              <p className="hint">
+                Se muestran bajo la foto en el blog como «Foto: autor · Fuente».
+              </p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="url-media" className="label">
               URL en el servidor
@@ -368,7 +433,7 @@ function DetalleArchivo({
             </button>
             <button
               type="button"
-              onClick={() => void onSave(media, alt, caption)}
+              onClick={() => void onSave(media, { alt, caption, author, source, sourceUrl })}
               className="btn-primary"
             >
               Guardar cambios

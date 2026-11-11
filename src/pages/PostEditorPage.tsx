@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BlockEditor, SubidorArchivo } from '@/components/BlockEditor';
+import { CreditosFoto } from '@/components/CreditosFoto';
 import {
   Contador,
   DESC_MAX,
@@ -371,6 +372,14 @@ export function PostEditorPage() {
                       Una frase corta. Google la lee porque no puede ver fotos.
                     </p>
                   </div>
+                  {form.coverImage && (
+                    <CreditosFoto
+                      key={form.coverImage.id}
+                      media={form.coverImage}
+                      idBase="creditos-portada"
+                      onChange={(media) => setForm((prev) => ({ ...prev, coverImage: media }))}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-4">
